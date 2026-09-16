@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Copy, Trash2, UserPlus } from "lucide-react";
+import { Copy, Globe2, Scale, Trash2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,11 @@ const ROLE_LABEL: Record<string, string> = { OWNER: "Propriétaire", ADMIN: "Adm
 interface Props {
   entityId: string; role: string; currentUserId: string;
   entity: { name: string; kind: "COMPANY" | "INDIVIDUAL"; siren: string; legalForm: string; fiscalYearEndMonth: number; fiscalYearEndDay: number; costMethod: "CUMP" | "FIFO" };
+  country: {
+    code: string; name: string; flag: string; currency: string; timezone: string;
+    framework: string; auditFile: string; draft: boolean; lastReviewed: string;
+    costMethods: string[]; closingValuation: string; assumptions: string[];
+  };
   chart: { key: string; description: string; number: string; label: string; defaultNumber: string }[];
   capitalizeFees: boolean;
   assetAccounts: { asset: string; number: string }[];
@@ -32,6 +37,7 @@ export function SettingsClient(p: Props) {
     <Tabs defaultValue="entity">
       <TabsList className="flex-wrap">
         <TabsTrigger value="entity">Dossier</TabsTrigger>
+        <TabsTrigger value="country">Juridiction</TabsTrigger>
         {p.entity.kind === "COMPANY" ? <TabsTrigger value="chart">Plan de comptes</TabsTrigger> : <TabsTrigger value="external">Avoirs externes</TabsTrigger>}
         <TabsTrigger value="members">Collaborateurs</TabsTrigger>
         {p.role === "OWNER" ? <TabsTrigger value="danger">Zone de danger</TabsTrigger> : null}
@@ -39,6 +45,47 @@ export function SettingsClient(p: Props) {
       <TabsContent value="entity"><EntityForm {...p} canAdmin={canAdmin} /></TabsContent>
       <TabsContent value="chart"><ChartForm {...p} canAdmin={canAdmin} /></TabsContent>
       <TabsContent value="external"><ExternalForm {...p} canAdmin={canAdmin} /></TabsContent>
+      <TabsContent value="country">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Globe2 className="h-4 w-4 text-fg-subtle" /> {p.country.flag} {p.country.name}</CardTitle>
+              <CardDescription>
+                Le pays fixe le référentiel comptable, la devise des livres, le calendrier des dates, le fichier d&apos;audit et le régime d&apos;imposition. Il se choisit à la création du dossier et ne se change pas ensuite : les écritures déjà produites suivent le plan de comptes du pays d&apos;origine.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+                <div><dt className="text-fg-muted">Référentiel comptable</dt><dd className="font-medium">{p.country.framework}</dd></div>
+                <div><dt className="text-fg-muted">Devise des livres</dt><dd className="font-medium">{p.country.currency}</dd></div>
+                <div><dt className="text-fg-muted">Fichier d&apos;audit</dt><dd className="font-medium">{p.country.auditFile}</dd></div>
+                <div><dt className="text-fg-muted">Fuseau comptable</dt><dd className="font-medium">{p.country.timezone}</dd></div>
+                <div className="sm:col-span-2"><dt className="text-fg-muted">Méthodes de coût admises</dt><dd className="font-medium">{p.country.costMethods.join(", ")}</dd></div>
+              </dl>
+              <p className="mt-4 border-t border-border pt-3 text-sm text-fg-muted">{p.country.closingValuation}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Scale className="h-4 w-4 text-fg-subtle" /> Hypothèses de ce jeu de règles</CardTitle>
+              <CardDescription>
+                {p.country.draft
+                  ? `Encodé le ${fmtDate(p.country.lastReviewed)} à partir des textes cités, sans relecture par un professionnel de ${p.country.name}.`
+                  : `Relu le ${fmtDate(p.country.lastReviewed)} par un professionnel de ${p.country.name}.`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {p.country.draft ? <Alert tone="warning" className="mb-3">Vérifiez ces points avant de produire une déclaration.</Alert> : null}
+              <ul className="space-y-2 text-sm text-fg-muted">
+                {p.country.assumptions.map((a, i) => (
+                  <li key={i} className="flex gap-2"><span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-fg-subtle" aria-hidden /><span>{a}</span></li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+
       <TabsContent value="members"><Members {...p} canAdmin={canAdmin} /></TabsContent>
       <TabsContent value="danger"><Danger entityId={p.entityId} name={p.entity.name} /></TabsContent>
     </Tabs>

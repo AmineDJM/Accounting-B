@@ -19,6 +19,18 @@ import { zonedYear } from "./tz";
  * - PFU 30 % (12,8 % IR + 17,2 % PS) ou option pour le barème (12,8 % remplacé par le TMI).
  */
 
+/*
+ * Kept deliberately, although the application computes French tax through the
+ * country pack's engine.
+ *
+ * This is the implementation written straight from article 150 VH bis, without
+ * the pack framework around it, and `tests/engine/fr-cross-check.test.ts` runs
+ * the same history through both and pins the results against each other. Two
+ * independently written implementations agreeing on a legal formula is stronger
+ * evidence than one implementation passing its own tests; the day they diverge,
+ * the cross-check fails here rather than in a client's return.
+ */
+
 export interface IndividualOptions {
   /** Include acquisition fees paid in fiat in the total acquisition price (default true). */
   includeAcquisitionFees?: boolean;

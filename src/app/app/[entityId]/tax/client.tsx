@@ -198,7 +198,9 @@ export function TaxClient({
                         <Td className="font-medium">{l.form}</Td>
                         <Td><Badge tone="primary">{l.box}</Badge></Td>
                         <Td className="text-fg-muted">{l.label}</Td>
-                        <Td className="text-right num tabular">{money(l.raw ?? l.value, currency)}</Td>
+                        <Td className={l.kind === "TEXT" ? "text-right text-fg-muted" : "text-right num tabular"}>
+                          {l.kind === "TEXT" ? l.value : money(l.raw ?? l.value, currency)}
+                        </Td>
                       </tr>
                     ))}
                   </tbody>

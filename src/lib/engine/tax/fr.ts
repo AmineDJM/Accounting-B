@@ -230,7 +230,9 @@ function summariseFr(events: TaxableEvent[], income: IncomeItem[], rules: GainsR
     const incomeTotal = incomeYear.reduce((a, i) => a.plus(i.valueBase), ZERO);
 
     const formLines = [
-      { form: "2086", box: "212", label: "Valeur globale du portefeuille", value: "voir le détail par cession", note: "une valeur par cession" },
+      // The article prices each disposal against the portfolio value of that
+      // day, so this box holds one figure per disposal and no yearly total.
+      { form: "2086", box: "212", label: "Valeur globale du portefeuille", value: "une valeur par cession, voir le détail", kind: "TEXT" as const, note: "renseignée cession par cession" },
       { form: "2086", box: "213", label: "Prix de cession", value: cents(grossProceeds).toFixed(2), raw: grossProceeds.toString() },
       { form: "2086", box: "221", label: "Plus ou moins-value de l'année", value: cents(net).toFixed(2), raw: net.toString() },
       { form: "2042 C", box: "3AN", label: "Plus-value imposable", value: cents(taxable).toFixed(2), raw: taxable.toString() },

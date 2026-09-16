@@ -183,3 +183,30 @@ describe("the divergences between countries are real", () => {
     expect(year("ES")?.taxableBase.toNumber()).toBeGreaterThan(0);
   });
 });
+
+describe("form lines are safe to render", () => {
+  it("never leaves a monetary box holding text", () => {
+    for (const code of COUNTRY_ORDER) {
+      const r = run(code);
+      for (const y of r.years) {
+        for (const l of y.formLines) {
+          if (l.kind === "TEXT") continue;
+          const n = Number(l.raw ?? l.value);
+          expect(Number.isFinite(n), `${code} ${l.form} ${l.box}: "${l.raw ?? l.value}"`).toBe(true);
+        }
+      }
+      for (const w of r.wealth) {
+        for (const l of w.formLines) {
+          if (l.kind === "TEXT") continue;
+          expect(Number.isFinite(Number(l.raw ?? l.value)), `${code} ${l.form} ${l.box}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("marks France's portfolio-value box as text, since it holds one figure per disposal", () => {
+    const fr = run("FR").years.at(-1);
+    const box212 = fr?.formLines.find((l) => l.box === "212");
+    expect(box212?.kind).toBe("TEXT");
+  });
+});

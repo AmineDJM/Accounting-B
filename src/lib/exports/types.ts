@@ -46,6 +46,11 @@ export interface AccountBalance {
 
 export interface AuditFileInput {
   entity: AuditFileEntity;
+  /**
+   * The period, as instants. `end` is the last instant of the year, so it is
+   * rendered on the entity's own calendar: read on another calendar it can
+   * fall on the first day of the following year.
+   */
   fiscalYear: { start: Date; end: Date; label?: string };
   entries: JournalEntry[];
   chart?: ChartOfAccounts;

@@ -1,6 +1,7 @@
 import { cents, ZERO, type Decimal } from "@/lib/engine/money";
 import type { JournalEntry, JournalLine } from "@/lib/engine/journal";
 import { zonedParts } from "@/lib/engine/tz";
+import { checkPeriod } from "./period";
 import type { AuditFileInput, AuditFileOutput } from "./types";
 
 /**
@@ -157,6 +158,7 @@ export function exportDatev(input: AuditFileInput): AuditFileOutput {
     "", "", "", "", "0", "", q(""), "", "", q(input.comment ?? ""),
   ].join(";");
 
+  warnings.push(...checkPeriod(input.fiscalYear.start, input.fiscalYear.end, tz));
   if (!e.consultantNumber || !e.clientNumber) {
     warnings.push("Numéro de conseil (Berater) ou de dossier (Mandant) DATEV absent : le cabinet destinataire ne pourra pas rattacher le lot. Renseignez-les dans les paramètres du dossier avant l'export.");
   }

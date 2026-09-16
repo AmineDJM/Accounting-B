@@ -1,6 +1,8 @@
 import { requireUser } from "@/auth";
 import { listMembers, requireEntity } from "@/lib/dal/entities";
-import { DEFAULT_CHART, type ChartOfAccounts } from "@/lib/engine/chart";
+import { type ChartOfAccounts } from "@/lib/engine/chart";
+import { getPack } from "@/lib/countries/registry";
+import { FORMAT_LABELS } from "@/lib/exports";
 import { PageHeader } from "@/components/ui/misc";
 import { SettingsClient } from "./client";
 
@@ -19,19 +21,40 @@ export default async function SettingsPage({ params }: { params: Promise<{ entit
   const user = await requireUser();
   const { entity, role } = await requireEntity(user.id, entityId);
   const { members, pending } = await listMembers(user.id, entityId);
+  const pack = getPack(entity.country);
   const overrides = (entity.chartOverrides ?? {}) as Partial<ChartOfAccounts>;
-  const chart = Object.entries(DEFAULT_CHART).filter(([, v]) => typeof v === "object").map(([key, v]) => {
+  // The chart shown is the country's own, with the practice's renumbering on
+  // top: a Portuguese file must not be offered French account numbers.
+  const chart = Object.entries(pack.company.chart).filter(([, v]) => typeof v === "object").map(([key, v]) => {
     const def = v as { number: string; label: string };
     const o = overrides[key as keyof ChartOfAccounts] as { number: string; label: string } | undefined;
     return { key, description: CHART_LABELS[key] ?? key, number: o?.number ?? def.number, label: o?.label ?? def.label, defaultNumber: def.number };
   });
   return (
     <>
-      <PageHeader title="Paramètres" description="Identité du dossier, plan de comptes, accès des collaborateurs." />
+      <PageHeader
+        eyebrow={`${pack.flag} ${pack.name.fr}`}
+        title="Paramètres"
+        description={`Identité du dossier, plan de comptes ${pack.company.framework.fr}, accès des collaborateurs. Le pays fixe le référentiel, la devise des livres et le fichier d'audit produit (${FORMAT_LABELS[pack.company.auditFile].fr}).`}
+      />
       <SettingsClient
         entityId={entityId}
         role={role}
         entity={{ name: entity.name, kind: entity.kind, siren: entity.siren ?? "", legalForm: entity.legalForm ?? "", fiscalYearEndMonth: entity.fiscalYearEndMonth, fiscalYearEndDay: entity.fiscalYearEndDay, costMethod: entity.costMethod as "CUMP" | "FIFO" }}
+        country={{
+          code: pack.code,
+          name: pack.name.fr,
+          flag: pack.flag,
+          currency: entity.baseCurrency,
+          timezone: entity.timezone,
+          framework: pack.company.framework.fr,
+          auditFile: FORMAT_LABELS[pack.company.auditFile].fr,
+          draft: pack.review.status !== "REVIEWED",
+          lastReviewed: pack.review.lastReviewed,
+          costMethods: pack.company.costMethods,
+          closingValuation: pack.company.closingValuationNote.fr,
+          assumptions: pack.assumptions.map((a) => a.fr),
+        }}
         chart={chart}
         capitalizeFees={Boolean(overrides.capitalizeFees)}
         assetAccounts={Object.entries(entity.assetAccountMap ?? {}).map(([asset, number]) => ({ asset, number }))}

@@ -68,8 +68,17 @@ export interface FormLine {
   form: string;
   box: string;
   label: string;
+  /** Formatted for display, in the entity's locale. */
   value: string;
+  /** Exact decimal string, for a monetary box. */
   raw?: string;
+  /**
+   * MONEY is the default. TEXT marks a box that does not carry an amount at
+   * all — France's box 212 holds one portfolio value per disposal, not a
+   * yearly total — so the interface prints it instead of parsing it as a
+   * number and rendering NaN.
+   */
+  kind?: "MONEY" | "TEXT";
   note?: string;
   trace?: TraceStep;
 }

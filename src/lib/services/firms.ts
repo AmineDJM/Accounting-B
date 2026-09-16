@@ -3,6 +3,10 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { auditLog, entities, entityMembers, firmMembers, firms, fiscalYears, journalRuns, taxRuns, transactions } from "@/lib/db/schema";
 import { getPack } from "@/lib/countries/registry";
+import type { ClientRow, Workflow } from "@/lib/cockpit";
+
+export type { ClientRow, Workflow };
+export { summarise } from "@/lib/cockpit";
 
 export type Firm = typeof firms.$inferSelect;
 export type FiscalYearRow = typeof fiscalYears.$inferSelect;
@@ -17,22 +21,6 @@ export type FiscalYearRow = typeof fiscalYears.$inferSelect;
  * many transactions are waiting to be qualified, and whether the country's
  * rules are still a draft.
  */
-export interface ClientRow {
-  entityId: string;
-  name: string;
-  country: string;
-  countryName: string;
-  flag: string;
-  currency: string;
-  clientRef: string | null;
-  kind: string;
-  draft: boolean;
-  fiscalYear: { id: string; label: string; workflow: string; dueDate: Date | null; assigneeId: string | null } | null;
-  counts: { transactions: number; toQualify: number };
-  lastJournalRun: Date | null;
-  lastTaxRun: Date | null;
-}
-
 export async function listFirmsForUser(userId: string): Promise<Firm[]> {
   const db = await getDb();
   const rows = await db
@@ -123,8 +111,6 @@ export async function cockpit(userId: string, opts: { firmId?: string; year?: nu
     });
 }
 
-export type Workflow = "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE";
-
 export async function setWorkflow(userId: string, entityId: string, fiscalYearId: string, workflow: Workflow, assigneeId?: string | null, dueDate?: Date | null): Promise<void> {
   const db = await getDb();
   const ids = await visibleEntityIds(userId);
@@ -134,19 +120,4 @@ export async function setWorkflow(userId: string, entityId: string, fiscalYearId
     .set({ workflow, ...(assigneeId !== undefined ? { assigneeId } : {}), ...(dueDate !== undefined ? { dueDate } : {}) })
     .where(and(eq(fiscalYears.id, fiscalYearId), eq(fiscalYears.entityId, entityId)));
   await db.insert(auditLog).values({ entityId, userId, action: "workflow.set", details: { fiscalYearId, workflow } });
-}
-
-/** Counts per workflow state, for the cockpit header. */
-export function summarise(rows: ClientRow[]) {
-  return {
-    clients: rows.length,
-    toQualify: rows.reduce((a, r) => a + r.counts.toQualify, 0),
-    byWorkflow: rows.reduce<Record<string, number>>((acc, r) => {
-      const k = r.fiscalYear?.workflow ?? "NONE";
-      acc[k] = (acc[k] ?? 0) + 1;
-      return acc;
-    }, {}),
-    countries: [...new Set(rows.map((r) => r.country))].sort(),
-    drafts: rows.filter((r) => r.draft).length,
-  };
 }

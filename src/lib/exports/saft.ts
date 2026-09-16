@@ -1,5 +1,6 @@
 import { cents, ZERO, type Decimal } from "@/lib/engine/money";
 import { zonedParts } from "@/lib/engine/tz";
+import { checkPeriod } from "./period";
 import type { AuditFileInput, AuditFileOutput } from "./types";
 
 /**
@@ -174,6 +175,7 @@ export function exportSaftPt(input: AuditFileInput): AuditFileOutput {
     "</AuditFile>",
   ].filter((l) => l !== "").join("\n") + "\n";
 
+  warnings.push(...checkPeriod(input.fiscalYear.start, input.fiscalYear.end, tz));
   if (!totalDebit.eq(totalCredit)) {
     warnings.push(`Le fichier n'est pas équilibré : ${money(totalDebit)} au débit contre ${money(totalCredit)} au crédit. Corrigez les écritures avant transmission.`);
   }

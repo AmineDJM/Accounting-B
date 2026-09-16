@@ -96,9 +96,17 @@ export async function createEntity(userId: string, input: CreateEntityInput): Pr
   return entity;
 }
 
-/** Computes fiscal year boundaries [start, end] containing `date` for an entity's closing month/day. */
-export function fiscalYearBounds(entity: Pick<Entity, "fiscalYearEndMonth" | "fiscalYearEndDay">, date: Date): { start: Date; end: Date; label: string } {
-  return fiscalYearBoundsZoned(entity.fiscalYearEndMonth, entity.fiscalYearEndDay, date);
+/**
+ * Fiscal year boundaries containing `date`, on the entity's own calendar.
+ *
+ * The zone matters: a year closed at the last instant of 31 December in Lisbon
+ * is one hour later than the same instant in Paris, and rendering the Lisbon
+ * boundary on the Paris calendar puts the closing date in the following year.
+ * Every audit file carries that date, so the zone is the entity's, not a
+ * default.
+ */
+export function fiscalYearBounds(entity: Pick<Entity, "fiscalYearEndMonth" | "fiscalYearEndDay"> & { timezone?: string }, date: Date): { start: Date; end: Date; label: string } {
+  return fiscalYearBoundsZoned(entity.fiscalYearEndMonth, entity.fiscalYearEndDay, date, entity.timezone || undefined);
 }
 
 /** Creates fiscal years from `from` until the current one (idempotent). */
