@@ -7,8 +7,10 @@ import { acceptInvitation, createEntity, setLastEntity } from "@/lib/dal/entitie
 
 const createSchema = z.object({
   kind: z.enum(["COMPANY", "INDIVIDUAL"]),
+  country: z.enum(["FR", "DE", "AT", "ES", "IT", "PT", "BE", "NL", "CH", "AE", "OM", "QA"]).default("FR"),
   name: z.string().trim().min(2, "Nom trop court").max(120),
   siren: z.string().trim().regex(/^\d{9}$/, "Le SIREN comporte 9 chiffres").optional().or(z.literal("")),
+  taxId: z.string().trim().max(32).optional().or(z.literal("")),
   legalForm: z.string().trim().max(32).optional().or(z.literal("")),
   fiscalYearEndMonth: z.coerce.number().int().min(1).max(12).default(12),
   fiscalYearEndDay: z.coerce.number().int().min(1).max(31).default(31),
@@ -30,7 +32,9 @@ export async function createEntityAction(_prev: ActionState, formData: FormData)
   const entity = await createEntity(user.id, {
     name: d.name,
     kind: d.kind,
+    country: d.country,
     siren: d.siren || null,
+    taxId: d.taxId || null,
     legalForm: d.legalForm || null,
     fiscalYearEndMonth: d.kind === "INDIVIDUAL" ? 12 : d.fiscalYearEndMonth,
     fiscalYearEndDay: d.kind === "INDIVIDUAL" ? 31 : d.fiscalYearEndDay,

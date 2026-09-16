@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { BookOpen, Building2, Check, ChevronsUpDown, Download, LayoutDashboard, ListOrdered, LogOut, Menu, Plus, Receipt, Settings, UserRound, Wallet, X } from "lucide-react";
+import { BookOpen, Building2, Check, ChevronsUpDown, Download, GitCompareArrows, LayoutDashboard, ListOrdered, LogOut, Menu, Plus, Receipt, Settings, UserRound, Users, Wallet, X } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { cn } from "@/lib/utils";
 import { signOutAction, switchEntityAction } from "@/app/app/actions";
 
-export interface ShellEntity { id: string; name: string; kind: "COMPANY" | "INDIVIDUAL"; role: string }
+export interface ShellEntity { id: string; name: string; kind: "COMPANY" | "INDIVIDUAL"; role: string; country?: string; flag?: string }
 export interface ShellUser { name: string | null; email: string | null; image: string | null }
 
 const ROLE_LABEL: Record<string, string> = { OWNER: "Propriétaire", ADMIN: "Admin", ACCOUNTANT: "Comptable", VIEWER: "Lecture" };
@@ -24,7 +24,9 @@ export function AppShell({ entity, entities, user, flagged, children }: { entity
     { href: `${base}/dashboard`, label: "Tableau de bord", icon: LayoutDashboard },
     { href: `${base}/accounts`, label: "Comptes & imports", icon: Wallet },
     { href: `${base}/transactions`, label: "Transactions", icon: ListOrdered, badge: flagged },
-    ...(entity.kind === "COMPANY" ? [{ href: `${base}/journal`, label: "Journal & FEC", icon: BookOpen }] : [{ href: `${base}/tax`, label: "Plus-values (2086)", icon: Receipt }]),
+    ...(entity.kind === "COMPANY" ? [{ href: `${base}/journal`, label: "Journal comptable", icon: BookOpen }] : []),
+    { href: `${base}/tax`, label: "Fiscalité", icon: Receipt },
+    { href: `${base}/dac8`, label: "Rapprochement DAC8", icon: GitCompareArrows },
     { href: `${base}/exports`, label: "Exports", icon: Download },
     { href: `${base}/settings`, label: "Paramètres", icon: Settings },
   ];
@@ -42,7 +44,7 @@ export function AppShell({ entity, entities, user, flagged, children }: { entity
               <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", entity.kind === "COMPANY" ? "bg-primary-soft text-primary" : "bg-info-soft text-info")}>{entity.kind === "COMPANY" ? <Building2 className="h-4 w-4" /> : <UserRound className="h-4 w-4" />}</span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">{entity.name}</span>
-                <span className="block text-[11px] text-fg-subtle">{entity.kind === "COMPANY" ? "Entreprise" : "Particulier"} · {ROLE_LABEL[entity.role] ?? entity.role}</span>
+                <span className="block text-[11px] text-fg-subtle">{entity.flag ? `${entity.flag} ` : ""}{entity.kind === "COMPANY" ? "Entreprise" : "Particulier"} · {ROLE_LABEL[entity.role] ?? entity.role}</span>
               </span>
               <ChevronsUpDown className="h-4 w-4 text-fg-subtle" />
             </button>
@@ -53,10 +55,12 @@ export function AppShell({ entity, entities, user, flagged, children }: { entity
               <DropdownMenuItem key={e.id} data-testid="entity-option" onSelect={() => switchEntityAction(e.id)}>
                 {e.kind === "COMPANY" ? <Building2 className="h-4 w-4 text-fg-subtle" /> : <UserRound className="h-4 w-4 text-fg-subtle" />}
                 <span className="flex-1 truncate">{e.name}</span>
+                {e.flag ? <span className="text-sm" aria-hidden>{e.flag}</span> : null}
                 {e.id === entity.id ? <Check className="h-4 w-4 text-primary" /> : null}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
+            <DropdownMenuItem asChild><Link href="/app/clients"><Users className="h-4 w-4" /> Portefeuille clients</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link href="/app/new"><Plus className="h-4 w-4" /> Nouveau dossier</Link></DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -4,6 +4,8 @@ import { getDb } from "@/lib/db";
 import { auditLog, entities, entityMembers, exchangeAccounts, fiscalYears, invitations, users, type EntityKind, type MemberRole } from "@/lib/db/schema";
 import { randomBytes } from "node:crypto";
 import { fiscalYearBoundsZoned } from "@/lib/engine/tz";
+import { getPack } from "@/lib/countries/registry";
+import type { CountryPack } from "@/lib/countries/types";
 
 export type Entity = typeof entities.$inferSelect;
 export type FiscalYear = typeof fiscalYears.$inferSelect;
@@ -43,26 +45,47 @@ export async function requireEntity(userId: string, entityId: string, minRole: M
 export interface CreateEntityInput {
   name: string;
   kind: EntityKind;
+  /** ISO 3166-1 alpha-2 code of the jurisdiction whose rules govern the file. */
+  country?: string;
   siren?: string | null;
+  taxId?: string | null;
   legalForm?: string | null;
   fiscalYearEndMonth?: number;
   fiscalYearEndDay?: number;
-  costMethod?: "CUMP" | "FIFO";
+  costMethod?: "CUMP" | "FIFO" | "LIFO" | "HIFO";
   firstFiscalYearStart?: Date;
+  firmId?: string | null;
+  clientRef?: string | null;
+}
+
+/** The method the country's framework lists first, mapped onto the stored enum. */
+function defaultCostMethod(pack: CountryPack): "CUMP" | "FIFO" | "LIFO" | "HIFO" {
+  const first = pack.company.costMethods[0];
+  return first === "AVERAGE" ? "CUMP" : first === "HIFO" ? "HIFO" : first === "LIFO" ? "LIFO" : "FIFO";
 }
 
 export async function createEntity(userId: string, input: CreateEntityInput): Promise<Entity> {
   const db = await getDb();
+  const pack = getPack(input.country);
   const [entity] = await db
     .insert(entities)
     .values({
       name: input.name.trim(),
       kind: input.kind,
+      // The country decides the chart of accounts, the calendar, the currency
+      // and the engine, so it is stored on the entity rather than inferred.
+      country: pack.code,
+      timezone: pack.timezone,
+      locale: pack.locale,
+      baseCurrency: pack.baseCurrency,
       siren: input.siren?.replace(/\D/g, "") || null,
+      taxId: input.taxId ?? null,
       legalForm: input.legalForm ?? null,
-      fiscalYearEndMonth: input.fiscalYearEndMonth ?? 12,
-      fiscalYearEndDay: input.fiscalYearEndDay ?? 31,
-      costMethod: input.costMethod ?? "CUMP",
+      fiscalYearEndMonth: input.fiscalYearEndMonth ?? pack.fiscalYear.endMonth,
+      fiscalYearEndDay: input.fiscalYearEndDay ?? pack.fiscalYear.endDay,
+      costMethod: input.costMethod ?? defaultCostMethod(pack),
+      firmId: input.firmId ?? null,
+      clientRef: input.clientRef ?? null,
       createdBy: userId,
     })
     .returning();

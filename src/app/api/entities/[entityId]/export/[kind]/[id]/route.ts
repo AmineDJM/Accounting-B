@@ -4,11 +4,13 @@ import { requireEntity } from "@/lib/dal/entities";
 import { exportFec, loadEntries, trialBalance } from "@/lib/services/journal";
 import { loadAllTransactions } from "@/lib/dal/transactions";
 import { getJob } from "@/lib/dal/jobs";
-import { disposalsCsv } from "@/lib/services/tax";
 import { chartFor } from "@/lib/services/journal";
 import { listAccounts } from "@/lib/dal/accounts";
-import type { IndividualResult } from "@/lib/engine/individual";
+import { buildAuditFile } from "@/lib/services/auditfile";
+import { eventsCsv } from "@/lib/services/countrytax";
 import { D } from "@/lib/engine/money";
+import type { TaxComputationResult, TaxableEvent } from "@/lib/engine/tax/types";
+import type { AuditFileFormat } from "@/lib/exports";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +18,7 @@ const csvCell = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 const csvFile = (name: string, rows: unknown[][]) =>
   new NextResponse("﻿" + rows.map((r) => r.map(csvCell).join(";")).join("\r\n"), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${name}"` } });
 
-export async function GET(_req: Request, { params }: { params: Promise<{ entityId: string; kind: string; id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ entityId: string; kind: string; id: string }> }) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   const { entityId, kind, id } = await params;
@@ -28,6 +30,20 @@ export async function GET(_req: Request, { params }: { params: Promise<{ entityI
       case "fec": {
         const fec = await exportFec(session.user.id, entityId, id);
         return new NextResponse(fec.content, { headers: { "Content-Type": "text/plain; charset=utf-8", "Content-Disposition": `attachment; filename="${fec.fileName}"`, "X-FEC-Valid": String(fec.report.ok) } });
+      }
+      case "auditfile": {
+        // The country's own file by default; ?format= overrides it, which is
+        // what a practice needs when a file changes hands across a border.
+        const asked = new URL(req.url).searchParams.get("format") as AuditFileFormat | null;
+        const { output, bytes } = await buildAuditFile(session.user.id, entityId, id, asked ?? undefined);
+        return new NextResponse(new Uint8Array(bytes), {
+          headers: {
+            "Content-Type": `${output.mimeType}; charset=${output.encoding}`,
+            "Content-Disposition": `attachment; filename="${output.fileName}"`,
+            "X-Audit-Warnings": String(output.warnings.length),
+            "X-Audit-Format": output.format,
+          },
+        });
       }
       case "entries": {
         const entries = await loadEntries(id);
@@ -65,9 +81,21 @@ export async function GET(_req: Request, { params }: { params: Promise<{ entityI
       case "tax": {
         const job = await getJob(entityId, id);
         if (!job?.result) return NextResponse.json({ error: "Calcul introuvable" }, { status: 404 });
-        const r = job.result as { disposals: Record<string, string>[] };
-        const result = { disposals: r.disposals.map((d) => ({ txId: d.txId, date: new Date(d.date), asset: d.asset, qty: D(d.qty), portfolioValueEur: D(d.portfolioValueEur), grossProceedsEur: D(d.grossProceedsEur), feesEur: D(d.feesEur), netProceedsEur: D(d.netProceedsEur), totalAcquisitionEur: D(d.totalAcquisitionEur), fractionsPreviouslyDeductedEur: D(d.fractionsPreviouslyDeductedEur), netAcquisitionEur: D(d.netAcquisitionEur), fractionEur: D(d.fractionEur), gainEur: D(d.gainEur), warnings: [] })), years: [], totalAcquisitionEur: D(0), warnings: [] } as IndividualResult;
-        return new NextResponse(disposalsCsv(result), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="cessions-2086-${entity.name.replace(/\W+/g, "_")}.csv"` } });
+        // The stored run is the wire shape: amounts are exact strings, dates
+        // are ISO. Rehydrating only the fields the CSV needs keeps the reader
+        // honest about what it reports.
+        const stored = job.result as unknown as { events?: Record<string, string>[]; currency?: string };
+        const events: TaxableEvent[] = (stored.events ?? []).map((e) => ({
+          id: String(e.id), txId: String(e.txId), date: new Date(e.date), asset: String(e.asset), qty: D(e.qty),
+          disposalKind: e.disposalKind as TaxableEvent["disposalKind"],
+          counterAsset: e.counterAsset ? String(e.counterAsset) : undefined,
+          proceeds: D(e.proceeds), fees: D(e.fees), netProceeds: D(e.netProceeds), costBasis: D(e.costBasis), gain: D(e.gain),
+          exempt: Boolean(e.exempt), exemptReason: e.exemptReason ? String(e.exemptReason) : undefined,
+          holdingDays: e.holdingDays === undefined || e.holdingDays === null ? undefined : Number(e.holdingDays),
+          warnings: [], extra: {}, trace: { key: "", label: "", inputs: [], refs: [], steps: [] },
+        }));
+        const csv = eventsCsv({ events, currency: stored.currency ?? "EUR" } as TaxComputationResult);
+        return new NextResponse(csv, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="operations-${entity.name.replace(/\W+/g, "_")}.csv"` } });
       }
       default:
         return NextResponse.json({ error: "Export inconnu" }, { status: 404 });

@@ -3,6 +3,7 @@ import { requireUser } from "@/auth";
 import { AccessError, listEntitiesForUser, requireEntity } from "@/lib/dal/entities";
 import { transactionStats } from "@/lib/dal/transactions";
 import { AppShell } from "@/components/app/shell";
+import { getPack } from "@/lib/countries/registry";
 
 export default async function EntityLayout({ children, params }: { children: React.ReactNode; params: Promise<{ entityId: string }> }) {
   const { entityId } = await params;
@@ -17,8 +18,8 @@ export default async function EntityLayout({ children, params }: { children: Rea
   const [memberships, stats] = await Promise.all([listEntitiesForUser(user.id), transactionStats(entityId)]);
   return (
     <AppShell
-      entity={{ id: membership.entity.id, name: membership.entity.name, kind: membership.entity.kind, role: membership.role }}
-      entities={memberships.map((m) => ({ id: m.entity.id, name: m.entity.name, kind: m.entity.kind, role: m.role }))}
+      entity={{ id: membership.entity.id, name: membership.entity.name, kind: membership.entity.kind, role: membership.role, country: membership.entity.country, flag: getPack(membership.entity.country).flag }}
+      entities={memberships.map((m) => ({ id: m.entity.id, name: m.entity.name, kind: m.entity.kind, role: m.role, country: m.entity.country, flag: getPack(m.entity.country).flag }))}
       user={{ name: user.name, email: user.email, image: user.image }}
       flagged={stats.flagged}
     >
