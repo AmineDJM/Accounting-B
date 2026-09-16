@@ -341,12 +341,24 @@ export type Dac8Source = "CSV" | "XML" | "MANUAL";
 
 export interface Dac8Aggregate {
   asset: string;
-  /** ACQUISITION_FIAT | DISPOSAL_FIAT | ACQUISITION_CRYPTO | DISPOSAL_CRYPTO | RETAIL_PAYMENT | TRANSFER_IN | TRANSFER_OUT */
+  /**
+   * One of the eight CARF XML schema elements: CryptoFiatIn, CryptoFiatOut,
+   * CryptotoCryptoIn, CryptotoCryptoOut, CryptoTransferIn, CryptoTransferOut,
+   * TransferWallet, RRPT.
+   */
   type: string;
-  count: number;
+  /** Absent for TransferWallet, the only element with no transaction count. */
+  count?: number | null;
   units?: string;
+  /** The amount as the provider reported it, whichever fee treatment it used. */
+  amount?: string;
+  /** Kept for statements imported before the schema names were adopted. */
   grossAmount?: string;
   currency?: string;
+  /** ExchangeType or TransferType code (CARF401 to CARF606), when given. */
+  typeCode?: string;
+  /** AltValuation code (CARF1001 to CARF1004), when the provider used one. */
+  altValuation?: string;
 }
 
 export interface Dac8Holding {

@@ -3,7 +3,8 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { auditLog, fiscalYears, journalEntries, journalRuns } from "@/lib/db/schema";
 import { D, ZERO, type Decimal } from "@/lib/engine/money";
-import { DEFAULT_CHART, type ChartOfAccounts } from "@/lib/engine/chart";
+import { type ChartOfAccounts } from "@/lib/engine/chart";
+import { contextFor, tableFor } from "./country";
 import { generateJournal, type JournalEntry, type JournalResult } from "@/lib/engine/journal";
 import { valueTransactions } from "@/lib/engine/valuation";
 import { buildFecRows } from "@/lib/engine/fecbuild";
@@ -18,9 +19,9 @@ import { entities } from "@/lib/db/schema";
 export type JournalRun = typeof journalRuns.$inferSelect;
 export type StoredEntry = typeof journalEntries.$inferSelect;
 
+/** The chart of the entity's country, with the entity's own renumbering applied. */
 export function chartFor(entity: Entity): ChartOfAccounts {
-  const overrides = (entity.chartOverrides ?? {}) as Partial<ChartOfAccounts>;
-  return { ...DEFAULT_CHART, ...overrides };
+  return contextFor(entity).chart;
 }
 
 /** Values every transaction of the entity (fetching missing prices) and returns the engine inputs. */
@@ -36,10 +37,12 @@ export async function prepareValuation(entityId: string, entity: Entity, closing
   if (missing.length) log(`${missing.length} jour(s)/actif(s) sans cours : ${[...new Set(missing.map((m) => m.asset))].slice(0, 10).join(", ")}`);
   const from = txs[0]?.timestamp ?? new Date();
   const to = new Date(Math.max(...closingDates.map((d) => d.getTime()), Date.now()));
-  const table = await pricing.table(assets, from, to);
+  // Prices are cached in euro; an entity whose books are in another currency
+  // reads the same cache through a rebasing view rather than a second fetch.
+  const ctx = contextFor(entity);
+  const table = tableFor(await pricing.table(assets, from, to), ctx);
   const valued = valueTransactions(txs, table);
-  void entity;
-  return { txs, valued, table, assets, missing };
+  return { txs, valued, table, assets, missing, ctx };
 }
 
 /** Runs the accounting engine for a fiscal year and stores the resulting journal. */
@@ -62,6 +65,7 @@ export async function startJournalRun(userId: string, entityId: string, fiscalYe
     const result = generateJournal(valued, {
       chart: chartFor(entity),
       assetAccountMap: entity.assetAccountMap,
+      assetAccountWidth: contextFor(entity).pack.company.assetAccountWidth,
       fiscalYear: { start: fy.startDate, end: fy.endDate },
       method: entity.costMethod,
       accounts: accounts.map((a) => ({ id: a.id, label: a.label, index: a.index, journalCode: a.journalCode ?? undefined })),
