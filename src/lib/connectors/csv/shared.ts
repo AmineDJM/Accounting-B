@@ -92,6 +92,11 @@ export function num(v: string | undefined | null): Decimal {
   return neg ? D(s).neg() : D(s);
 }
 
+const MONTHS: Record<string, number> = {
+  jan: 1, feb: 2, fev: 2, mar: 3, apr: 4, avr: 4, may: 5, mai: 5, jun: 6, juin: 6, jul: 7, juil: 7,
+  aug: 8, aou: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+};
+
 /** Parses the many date shapes exports use, always yielding a UTC instant. */
 export function parseDate(v: string, assumeUtc = true): Date | null {
   if (!v) return null;
@@ -118,6 +123,26 @@ export function parseDate(v: string, assumeUtc = true): Date | null {
   // 02.01.2025 10:30 (German / Swiss)
   m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:[ ]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if (m) return new Date(Date.UTC(+m[3], +m[2] - 1, +m[1], +(m[4] ?? 0), +(m[5] ?? 0), +(m[6] ?? 0)));
+  // "Jan. 15, 2026, 10:30 AM" and "15 January 2026 10:30" — Bitstamp and
+  // several bank exports write the month as a word.
+  const named = s.match(/^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})(?:,?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AaPp][Mm])?)?/)
+    ?? s.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AaPp][Mm])?)?/);
+  if (named) {
+    // The two patterns put the month and the day the other way round.
+    const monthWord = /^[A-Za-z]/.test(named[1]) ? named[1] : named[2];
+    const dayStr = /^[A-Za-z]/.test(named[1]) ? named[2] : named[1];
+    const month = MONTHS[monthWord.slice(0, 3).toLowerCase()];
+    if (month) {
+      let hour = +(named[4] ?? 0);
+      const meridiem = named[7];
+      if (meridiem) {
+        const pm = meridiem.toLowerCase() === "pm";
+        if (pm && hour < 12) hour += 12;
+        if (!pm && hour === 12) hour = 0;
+      }
+      return new Date(Date.UTC(+named[3], month - 1, +dayStr, hour, +(named[5] ?? 0), +(named[6] ?? 0)));
+    }
+  }
   // Unix seconds or milliseconds
   if (/^\d{10}$/.test(s)) return new Date(Number(s) * 1000);
   if (/^\d{13}$/.test(s)) return new Date(Number(s));
