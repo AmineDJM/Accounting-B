@@ -140,6 +140,17 @@ CREATE TABLE "fiscal_years" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "impersonations" (
+	"id" text PRIMARY KEY NOT NULL,
+	"admin_id" text NOT NULL,
+	"target_user_id" text NOT NULL,
+	"reason" text NOT NULL,
+	"started_at" timestamp DEFAULT now() NOT NULL,
+	"ended_at" timestamp,
+	"expires_at" timestamp NOT NULL,
+	"user_agent" text
+);
+--> statement-breakpoint
 CREATE TABLE "import_files" (
 	"id" text PRIMARY KEY NOT NULL,
 	"entity_id" text NOT NULL,
@@ -280,6 +291,16 @@ CREATE TABLE "users" (
 	"email_verified" timestamp,
 	"image" text,
 	"locale" varchar(8) DEFAULT 'fr',
+	"platform_role" varchar(16) DEFAULT 'USER' NOT NULL,
+	"status" varchar(12) DEFAULT 'INVITED' NOT NULL,
+	"countries" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"admin_note" text,
+	"company" text,
+	"created_by_admin_id" text,
+	"activated_at" timestamp,
+	"suspended_at" timestamp,
+	"suspended_reason" text,
+	"last_seen_at" timestamp,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"last_entity_id" text,
 	CONSTRAINT "users_email_unique" UNIQUE("email")
@@ -319,6 +340,8 @@ ALTER TABLE "firm_members" ADD CONSTRAINT "firm_members_firm_id_firms_id_fk" FOR
 ALTER TABLE "firm_members" ADD CONSTRAINT "firm_members_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "firms" ADD CONSTRAINT "firms_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fiscal_years" ADD CONSTRAINT "fiscal_years_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "impersonations" ADD CONSTRAINT "impersonations_admin_id_users_id_fk" FOREIGN KEY ("admin_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "impersonations" ADD CONSTRAINT "impersonations_target_user_id_users_id_fk" FOREIGN KEY ("target_user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "import_files" ADD CONSTRAINT "import_files_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "import_files" ADD CONSTRAINT "import_files_account_id_exchange_accounts_id_fk" FOREIGN KEY ("account_id") REFERENCES "public"."exchange_accounts"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "import_files" ADD CONSTRAINT "import_files_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -342,6 +365,8 @@ CREATE INDEX "dac8_recon_entity_idx" ON "dac8_reconciliations" USING btree ("ent
 CREATE INDEX "dac8_statements_entity_idx" ON "dac8_statements" USING btree ("entity_id","year");--> statement-breakpoint
 CREATE INDEX "exchange_accounts_entity_idx" ON "exchange_accounts" USING btree ("entity_id");--> statement-breakpoint
 CREATE INDEX "fiscal_years_entity_idx" ON "fiscal_years" USING btree ("entity_id");--> statement-breakpoint
+CREATE INDEX "impersonations_admin_idx" ON "impersonations" USING btree ("admin_id","started_at");--> statement-breakpoint
+CREATE INDEX "impersonations_target_idx" ON "impersonations" USING btree ("target_user_id");--> statement-breakpoint
 CREATE INDEX "jobs_entity_idx" ON "jobs" USING btree ("entity_id","created_at");--> statement-breakpoint
 CREATE INDEX "journal_entries_run_idx" ON "journal_entries" USING btree ("run_id","journal_code","seq");--> statement-breakpoint
 CREATE INDEX "prices_asset_ts_idx" ON "prices" USING btree ("asset","ts");--> statement-breakpoint

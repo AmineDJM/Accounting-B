@@ -12,7 +12,8 @@ const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet"
 
 export function OnboardingWizard({ first, userName, countries }: { first: boolean; userName: string | null; countries: CountryChoice[] }) {
   const [kind, setKind] = useState<"COMPANY" | "INDIVIDUAL" | null>(null);
-  const [country, setCountry] = useState<string>("FR");
+  // The default is whatever this account is actually entitled to.
+  const [country, setCountry] = useState<string>(countries[0]?.code ?? "FR");
   const [step, setStep] = useState(0);
   const picked = countries.find((c) => c.code === country) ?? countries[0];
   const [state, action, pending] = useActionState<ActionState, FormData>(createEntityAction, undefined);
@@ -50,6 +51,14 @@ export function OnboardingWizard({ first, userName, countries }: { first: boolea
         </div>
       ) : step === 1 ? (
         <div className="mt-6">
+          {countries.length === 0 ? (
+            <div className="rounded-lg border border-warning-soft bg-warning-soft p-4 text-sm">
+              <p className="font-medium">Aucun pays n&apos;est ouvert sur ce compte.</p>
+              <p className="mt-1 text-fg-muted">
+                Les règles applicables sont accordées compte par compte par l&apos;administrateur de la plateforme. Demandez-lui d&apos;ouvrir les juridictions dont vous avez besoin, puis revenez ici.
+              </p>
+            </div>
+          ) : null}
           <div className="grid gap-2 sm:grid-cols-2">
             {countries.map((c) => (
               <button
@@ -88,7 +97,7 @@ export function OnboardingWizard({ first, userName, countries }: { first: boolea
           ) : null}
           <div className="mt-5 flex items-center justify-between">
             <Button type="button" variant="ghost" onClick={() => setStep(0)}><ChevronLeft className="h-4 w-4" /> Retour</Button>
-            <Button onClick={() => setStep(2)}>Continuer <ChevronRight className="h-4 w-4" /></Button>
+            <Button disabled={countries.length === 0} onClick={() => setStep(2)}>Continuer <ChevronRight className="h-4 w-4" /></Button>
           </div>
         </div>
       ) : (

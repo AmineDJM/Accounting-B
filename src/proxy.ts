@@ -10,7 +10,9 @@ const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
-  const isApp = pathname.startsWith("/app");
+  // The console is checked again in its layout, against the database: this is
+  // only the cheap first pass that keeps a signed-out visitor out.
+  const isApp = pathname.startsWith("/app") || pathname.startsWith("/admin");
   if (isApp && !req.auth?.user) {
     const url = new URL("/login", req.nextUrl);
     url.searchParams.set("callbackUrl", pathname);
@@ -21,5 +23,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/app/:path*", "/login"],
+  matcher: ["/app/:path*", "/admin/:path*", "/login"],
 };

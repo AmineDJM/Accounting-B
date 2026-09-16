@@ -32,6 +32,8 @@ services:
         sync: false
       - key: AUTH_DEV_LOGIN
         value: "false"
+      - key: SUPER_ADMIN_EMAILS
+        sync: false               # first administrator(s); nobody else can sign up
       - key: DB_AUTO_MIGRATE
         value: "true"
       - key: COINGECKO_API_KEY

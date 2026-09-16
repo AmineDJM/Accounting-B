@@ -2,6 +2,19 @@ import { boolean, index, integer, jsonb, numeric, pgTable, primaryKey, text, tim
 import type { AdapterAccountType } from "next-auth/adapters";
 
 /* ---------------------------------------------------------------- Auth.js */
+/**
+ * Platform-level role, distinct from the per-file role in `entityMembers`.
+ *
+ * A super administrator is the operator of the service, not a participant in
+ * any client's file: they create every account, decide which countries it may
+ * open files in, suspend it, and can look at any screen through an audited
+ * read-only view. Nobody signs up by themselves.
+ */
+export type PlatformRole = "SUPER_ADMIN" | "USER";
+
+/** INVITED accounts exist but cannot sign in until an administrator activates them. */
+export type AccountStatusKind = "INVITED" | "ACTIVE" | "SUSPENDED";
+
 export const users = pgTable("users", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name"),
@@ -9,9 +22,50 @@ export const users = pgTable("users", {
   emailVerified: timestamp("email_verified", { mode: "date" }),
   image: text("image"),
   locale: varchar("locale", { length: 8 }).default("fr"),
+  platformRole: varchar("platform_role", { length: 16 }).$type<PlatformRole>().notNull().default("USER"),
+  status: varchar("status", { length: 12 }).$type<AccountStatusKind>().notNull().default("INVITED"),
+  /**
+   * Countries this account may open files in. Empty means none: an account
+   * with no entitlement can sign in and see nothing, which is the safe state
+   * for an account created but not yet configured.
+   */
+  countries: jsonb("countries").$type<string[]>().notNull().default([]),
+  /** Free-text note the administrator keeps on the account. */
+  adminNote: text("admin_note"),
+  company: text("company"),
+  createdByAdminId: text("created_by_admin_id"),
+  activatedAt: timestamp("activated_at", { mode: "date" }),
+  suspendedAt: timestamp("suspended_at", { mode: "date" }),
+  suspendedReason: text("suspended_reason"),
+  lastSeenAt: timestamp("last_seen_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   lastEntityId: text("last_entity_id"),
 });
+
+/**
+ * Every time an administrator looks at the service through someone else's
+ * account.
+ *
+ * The row is the authority: the browser carries no identity of its own, so a
+ * cookie cannot be forged into a session. It is also the record a client is
+ * entitled to see if they ask who opened their file and why, which is why the
+ * reason is mandatory rather than optional.
+ */
+export const impersonations = pgTable(
+  "impersonations",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    adminId: text("admin_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    targetUserId: text("target_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    startedAt: timestamp("started_at", { mode: "date" }).defaultNow().notNull(),
+    endedAt: timestamp("ended_at", { mode: "date" }),
+    /** Hard stop, so a forgotten session cannot stay open indefinitely. */
+    expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+    userAgent: text("user_agent"),
+  },
+  (t) => [index("impersonations_admin_idx").on(t.adminId, t.startedAt), index("impersonations_target_idx").on(t.targetUserId)],
+);
 
 export const accounts = pgTable(
   "accounts",

@@ -55,9 +55,21 @@ function priceCurve(asset: string, day: number): number {
 
 async function main() {
   const db = await getDb();
+  // The demo account is a platform administrator, so the console has an
+  // operator to sign in as. A second, ordinary account shows what an account
+  // with a restricted set of countries looks like.
   const email = "demo@chainbook.local";
   let [user] = await db.select().from(users).where(eq(users.email, email));
-  if (!user) [user] = await db.insert(users).values({ email, name: "Compte démo", emailVerified: new Date() }).returning();
+  if (!user) {
+    [user] = await db
+      .insert(users)
+      .values({
+        email, name: "Compte démo", emailVerified: new Date(),
+        platformRole: "SUPER_ADMIN", status: "ACTIVE", countries: [],
+        company: "Chainbook", activatedAt: new Date(), lastSeenAt: new Date(),
+      })
+      .returning();
+  }
 
   const existing = await db.select().from(entities).where(eq(entities.createdBy, user.id));
   if (existing.length) { console.log("Demo data already present"); return; }
@@ -147,7 +159,27 @@ async function main() {
     if (target) await db.update(fiscalYears).set({ workflow, dueDate: new Date(Date.UTC(2026, 4, 20)) }).where(eq(fiscalYears.id, target.id));
   }
 
-  console.log(`Seeded demo user ${email}, ${all.length} files across ${new Set(all.map((e) => e.country)).size} countries, ${rows.length} prices`);
+  const extras: { email: string; name: string; company: string; countries: string[]; status: "ACTIVE" | "INVITED" | "SUSPENDED"; note: string }[] = [
+    { email: "marie.laurent@cabinet-lyon.fr", name: "Marie Laurent", company: "Cabinet Laurent & Associés", countries: ["FR", "BE", "CH"], status: "ACTIVE", note: "Cabinet de 12 personnes, dossiers franco-suisses." },
+    { email: "tobias.weber@kanzlei-berlin.de", name: "Tobias Weber", company: "Weber Steuerberatung", countries: ["DE", "AT"], status: "ACTIVE", note: "Ne traite que l'Allemagne et l'Autriche." },
+    { email: "ana.sousa@contabilidade.pt", name: "Ana Sousa", company: "Sousa Contabilidade", countries: ["PT", "ES"], status: "INVITED", note: "Compte ouvert, en attente du contrat signé." },
+    { email: "ancien.client@exemple.fr", name: "Ancien client", company: "Exemple SARL", countries: ["FR"], status: "SUSPENDED", note: "Contrat résilié en juillet." },
+  ];
+  for (const x of extras) {
+    const [existing] = await db.select().from(users).where(eq(users.email, x.email));
+    if (existing) continue;
+    await db.insert(users).values({
+      email: x.email, name: x.name, company: x.company, countries: x.countries,
+      platformRole: "USER", status: x.status, adminNote: x.note, createdByAdminId: user.id,
+      activatedAt: x.status === "ACTIVE" ? new Date(Date.now() - 40 * DAY) : null,
+      suspendedAt: x.status === "SUSPENDED" ? new Date(Date.now() - 20 * DAY) : null,
+      suspendedReason: x.status === "SUSPENDED" ? "Contrat résilié" : null,
+      lastSeenAt: x.status === "ACTIVE" ? new Date(Date.now() - 3 * DAY) : null,
+      emailVerified: new Date(),
+    });
+  }
+
+  console.log(`Seeded demo user ${email}, ${all.length} files across ${new Set(all.map((e) => e.country)).size} countries, ${rows.length} prices, ${extras.length + 1} accounts`);
 }
 
 main().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });

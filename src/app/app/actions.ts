@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser, signOut } from "@/auth";
 import { acceptInvitation, createEntity, setLastEntity } from "@/lib/dal/entities";
+import { assertCanWrite, assertCountryAllowed, PlatformError } from "@/lib/dal/platform";
+import { requireActor } from "@/auth";
 
 const createSchema = z.object({
   kind: z.enum(["COMPANY", "INDIVIDUAL"]),
@@ -21,7 +23,8 @@ const createSchema = z.object({
 export type ActionState = { error?: string; fieldErrors?: Record<string, string> } | undefined;
 
 export async function createEntityAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const user = await requireUser();
+  const actor = await requireActor();
+  const user = { id: actor.id };
   const parsed = createSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
@@ -29,6 +32,15 @@ export async function createEntityAction(_prev: ActionState, formData: FormData)
     return { error: "Vérifiez le formulaire", fieldErrors };
   }
   const d = parsed.data;
+  // The country is an entitlement, not a preference: a file can only be opened
+  // under rules the administrator granted this account.
+  try {
+    assertCanWrite(actor);
+    assertCountryAllowed(actor, d.country);
+  } catch (e) {
+    if (e instanceof PlatformError) return { error: e.message, fieldErrors: e.code === "COUNTRY" ? { country: e.message } : undefined };
+    throw e;
+  }
   const entity = await createEntity(user.id, {
     name: d.name,
     kind: d.kind,

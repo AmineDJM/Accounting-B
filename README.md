@@ -47,6 +47,10 @@ Les douze packs portent le statut **DRAFT** : ils sont écrits à partir des tex
 | --- | --- |
 | ![Tableau de bord](docs/screenshots/03-dashboard.png) | ![Journal](docs/screenshots/06-journal.png) |
 
+| Console d'administration | Droits d'un compte |
+| --- | --- |
+| ![Console d'administration](docs/screenshots/13-admin.png) | ![Droits d'un compte](docs/screenshots/17-admin-account.png) |
+
 Les captures se reproduisent avec `npm run seed`, puis `npm run demo` (qui lance les calculs), puis `npx tsx scripts/screenshots.ts`.
 
 Le fichier [`docs/demo-FEC-2025.txt`](docs/demo-FEC-2025.txt) est le FEC produit sur les données de démonstration (exercice 2025 de la société fictive « Nova Digital SAS », SIREN fictif).
@@ -78,11 +82,13 @@ src/lib/connectors/    Binance (API signée et CSV) et lecteurs Coinbase, Kraken
 src/lib/pricing/       fournisseurs de cours (klines Binance, taux BCE, CoinGecko en secours) et cache
 src/lib/db/            schéma Drizzle (cabinets, dossiers, comptes chiffrés, transactions, cours, exercices,
                        journaux, relevés DAC8, calculs fiscaux, jobs, audit)
-src/lib/dal/           accès aux données avec contrôle des droits par dossier
-src/lib/services/      contexte pays, synchronisation, import, journal, fiscalité, DAC8, fichiers d'audit, cockpit
+src/lib/authz.ts       rôles de plateforme, états de compte, droits pays (pur, testable)
+src/lib/dal/           accès aux données avec contrôle des droits par dossier, comptes et consultations
+src/lib/services/      contexte pays, synchronisation, import, journal, fiscalité, DAC8, fichiers d'audit,
+                       cockpit du cabinet, administration de la plateforme (mesures, comptes, audit)
 src/lib/i18n.ts        chaînes d'interface FR/EN (le vocabulaire juridique reste dans les packs, en langue locale)
-src/app/               pages, dont le portefeuille clients et le rapprochement DAC8
-tests/                 moteurs, packs pays, lecteurs CSV, DAC8, fichiers d'audit, chiffrement
+src/app/               pages, dont le portefeuille clients, le rapprochement DAC8 et la console /admin
+tests/                 moteurs, packs pays, lecteurs CSV, DAC8, fichiers d'audit, chiffrement, droits de plateforme
 ```
 
 ## Démarrer en local
@@ -92,10 +98,12 @@ cp .env.example .env.local        # AUTH_SECRET, APP_ENCRYPTION_KEY, AUTH_DEV_LO
 npm install
 npm run seed                      # données de démonstration (utilisateur demo@chainbook.local)
 npm run dev                       # http://localhost:3000 → « Entrer sans Google »
-npm test                          # 28 tests
+npm test                          # 143 tests
 ```
 
 Sans `DATABASE_URL`, une base PostgreSQL embarquée (PGlite) est créée dans `.data/pglite` et migrée automatiquement.
+
+`npm run seed` crée `demo@chainbook.local` en administrateur de plateforme, plus quatre comptes de cabinet dans les quatre états possibles. Sur une base vierge, le premier administrateur vient de `SUPER_ADMIN_EMAILS` (voir ci-dessous).
 
 ### Connexion Google
 
@@ -105,9 +113,38 @@ Sans `DATABASE_URL`, une base PostgreSQL embarquée (PGlite) est créée dans `.
 
 ## Déploiement sur Render
 
-Le fichier [`render.yaml`](render.yaml) décrit un service web Node (région Francfort) et une base PostgreSQL managée. Dans le tableau de bord Render : *New → Blueprint*, choisir ce dépôt, puis renseigner `AUTH_URL` (URL publique du service), `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`. `AUTH_SECRET`, `APP_ENCRYPTION_KEY` et `DATABASE_URL` sont générés automatiquement ; les migrations s'appliquent au démarrage.
+Le fichier [`render.yaml`](render.yaml) décrit un service web Node (région Francfort) et une base PostgreSQL managée. Dans le tableau de bord Render : *New → Blueprint*, choisir ce dépôt, puis renseigner `AUTH_URL` (URL publique du service), `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` et `SUPER_ADMIN_EMAILS` (sans quoi personne ne peut se connecter : il n'y a pas d'inscription libre). `AUTH_SECRET`, `APP_ENCRYPTION_KEY` et `DATABASE_URL` sont générés automatiquement ; les migrations s'appliquent au démarrage.
 
 Pourquoi Francfort : Binance refuse les requêtes depuis certaines adresses IP (HTTP 451, observé depuis un conteneur américain pendant le développement). Les synchronisations tournent dans le processus web (Render conserve un processus persistant) ; sur une plateforme serverless il faudrait une file de tâches.
+
+## Accès et administration
+
+**Il n'y a pas d'inscription libre.** Une adresse que personne n'a créée est refusée, même avec un compte Google valide : `signIn` interroge la table des comptes avant d'ouvrir la session et renvoie vers `/login?denied=…`. Ce choix est ce qui rend le reste tenable — un service qui calcule l'impôt de tiers ne peut pas laisser n'importe qui ouvrir un dossier.
+
+Deux rôles seulement, et un seul crée des comptes :
+
+| | Utilisateur | Administrateur de plateforme |
+| --- | --- | --- |
+| Créer un compte | non | oui, c'est le seul |
+| Activer / désactiver un compte | non | oui |
+| Ouvrir un pays à un compte | non | oui |
+| Voir les dossiers d'un autre compte | non | oui, en lecture seule et journalisé |
+| Voir les mesures de la plateforme | non | oui |
+
+**Le premier administrateur** vient de l'environnement : `SUPER_ADMIN_EMAILS` (adresses séparées par des virgules) est créé et promu à la première connexion. L'environnement fait autorité — une adresse qui y figure retrouve ses droits même si la ligne en base dit le contraire, ce qui évite de se verrouiller dehors. Une fois le premier administrateur en place, la variable peut être vidée.
+
+**Les quatre états d'un compte** : `INVITED` (créé, pas encore activé — la connexion est refusée), `ACTIVE`, `SUSPENDED` (refusée, avec le motif), et la suppression, qui n'existe pas : un compte désactivé conserve ses dossiers et son journal d'audit.
+
+**Les pays sont donnés compte par compte.** Chaque compte porte la liste des juridictions dans lesquelles il peut ouvrir un dossier ; `assertCountryAllowed` la vérifie dans la couche d'accès aux données, pas seulement dans l'écran. Retirer un pays n'efface aucun dossier existant : la console signale alors les dossiers devenus orphelins plutôt que de les détruire.
+
+**« Voir comme »** ouvre l'application telle que le compte la voit. Le motif est obligatoire (huit caractères au minimum), la session dure une heure, une seule à la fois, et tout est écrit dans `impersonations` et dans le journal d'audit. Deux garde-fous :
+
+- **lecture seule** : `assertCanWrite` refuse toute écriture tant que la consultation est ouverte, donc un administrateur ne peut rien modifier au nom d'un client ;
+- **l'autorité est la base, pas le cookie** : le cookie ne fait que désigner laquelle des sessions ouvertes de l'administrateur utiliser, si bien que le forger n'ouvre rien. Une bannière non masquable nomme le compte consulté, l'administrateur, le motif et l'heure d'expiration.
+
+La console (`/admin`) donne quatre écrans : vue d'ensemble (comptes, opérations, calculs, files d'attente, échecs, exposition aux packs DRAFT, histogramme d'activité sur trente jours), comptes (recherche, filtres par état, création, pays, note interne), activité (classement des comptes, comptes jamais démarrés, comptes dormants) et journal d'audit, consultation incluse.
+
+Ce qu'un administrateur **ne peut pas** faire : lire une clé d'API d'échange (elles sont chiffrées avec `APP_ENCRYPTION_KEY`, et seuls les quatre derniers caractères remontent jamais au navigateur), ni écrire au nom d'un client, ni consulter un compte sans laisser de trace.
 
 ## Régimes couverts
 
@@ -121,7 +158,9 @@ Pourquoi Francfort : Binance refuse les requêtes depuis certaines adresses IP (
 
 - Clés API demandées **en lecture seule**, testées avant enregistrement, chiffrées AES-256-GCM (`APP_ENCRYPTION_KEY`), jamais renvoyées au navigateur (seuls les 4 derniers caractères le sont).
 - Contrôle d'accès par dossier et par rôle (propriétaire, administrateur, comptable, lecture) dans la couche d'accès aux données, en plus de la protection des routes.
-- Journal d'audit (imports, requalifications, générations, exports), en-têtes de sécurité HTTP, mode démo désactivable (`AUTH_DEV_LOGIN=false` en production).
+- Pas d'inscription libre : les comptes sont créés depuis la console d'administration, le premier administrateur venant de `SUPER_ADMIN_EMAILS`. Accès aux pays donné compte par compte et vérifié dans la couche d'accès aux données.
+- Consultation d'un compte par un administrateur : en lecture seule, motivée, limitée à une heure, journalisée, et signalée par une bannière permanente.
+- Journal d'audit (imports, requalifications, générations, exports, consultations), en-têtes de sécurité HTTP, mode démo désactivable (`AUTH_DEV_LOGIN=false` en production).
 
 ## Limites connues
 

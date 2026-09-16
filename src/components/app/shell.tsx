@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { BookOpen, Building2, Check, ChevronsUpDown, Download, GitCompareArrows, LayoutDashboard, ListOrdered, LogOut, Menu, Plus, Receipt, Settings, UserRound, Users, Wallet, X } from "lucide-react";
+import { BookOpen, Building2, Check, ChevronsUpDown, Download, GitCompareArrows, LayoutDashboard, ListOrdered, LogOut, Menu, Plus, Receipt, Settings, ShieldCheck, UserRound, Users, Wallet, X } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { signOutAction, switchEntityAction } from "@/app/app/actions";
 
 export interface ShellEntity { id: string; name: string; kind: "COMPANY" | "INDIVIDUAL"; role: string; country?: string; flag?: string }
-export interface ShellUser { name: string | null; email: string | null; image: string | null }
+export interface ShellUser { name: string | null; email: string | null; image: string | null; isAdmin?: boolean }
 
 const ROLE_LABEL: Record<string, string> = { OWNER: "Propriétaire", ADMIN: "Admin", ACCOUNTANT: "Comptable", VIEWER: "Lecture" };
 
@@ -61,6 +61,7 @@ export function AppShell({ entity, entities, user, flagged, children }: { entity
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild><Link href="/app/clients"><Users className="h-4 w-4" /> Portefeuille clients</Link></DropdownMenuItem>
+            {user.isAdmin ? <DropdownMenuItem asChild><Link href="/admin"><ShieldCheck className="h-4 w-4" /> Console d&apos;administration</Link></DropdownMenuItem> : null}
             <DropdownMenuItem asChild><Link href="/app/new"><Plus className="h-4 w-4" /> Nouveau dossier</Link></DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

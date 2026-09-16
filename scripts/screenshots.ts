@@ -44,6 +44,33 @@ async function main() {
   // The practice cockpit and the country picker are not entity pages.
   await page.goto(`${BASE}/app/clients`); await page.waitForLoadState("networkidle"); await page.waitForTimeout(400);
   await page.screenshot({ path: `${OUT}/11-clients.png`, fullPage: true });
+  // The administration console, which the demo account can reach.
+  for (const [path, name] of [["", "13-admin"], ["/accounts", "14-admin-accounts"], ["/activity", "15-admin-activity"], ["/audit", "16-admin-audit"]] as [string, string][]) {
+    await page.goto(`${BASE}/admin${path}`); await page.waitForLoadState("networkidle"); await page.waitForTimeout(400);
+    await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
+  }
+  // The detail of one account. Reading the href and navigating to it is
+  // steadier than a click: the list re-renders after its filters hydrate, and
+  // a click resolved against the old tree goes nowhere.
+  await page.goto(`${BASE}/admin/accounts`); await page.waitForLoadState("networkidle");
+  // An active account other than the one signed in: it is the only case where
+  // every panel is live, view-as included.
+  const rows = await page.locator("tbody tr").evaluateAll((els) =>
+    els.map((tr) => ({
+      href: tr.querySelector<HTMLAnchorElement>('a[href^="/admin/accounts/"]')?.getAttribute("href") ?? "",
+      text: tr.textContent ?? "",
+    })),
+  );
+  const usable = rows.filter((r) => r.href.length > "/admin/accounts/".length);
+  const target = (usable.find((r) => !/Désactivé|En attente|demo@/.test(r.text)) ?? usable[0])?.href;
+  if (target) {
+    await page.goto(`${BASE}${target}`); await page.waitForLoadState("networkidle"); await page.waitForTimeout(400);
+    await page.screenshot({ path: `${OUT}/17-admin-account.png`, fullPage: true });
+  } else {
+    console.warn("no account link on /admin/accounts — 17-admin-account.png not captured");
+  }
+  console.log("captured admin console");
+
   await page.goto(`${BASE}/app/new`); await page.waitForLoadState("networkidle");
   await page.click('button:has-text("Particulier")');
   await page.click('button:has-text("Continuer")');

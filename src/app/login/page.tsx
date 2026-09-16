@@ -13,13 +13,36 @@ const ERRORS: Record<string, string> = {
   OAuthAccountNotLinked: "Un compte existe déjà avec cet e-mail via un autre mode de connexion.",
   AccessDenied: "Accès refusé par le fournisseur d'identité.",
   Configuration: "La connexion Google n'est pas configurée (AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET).",
-  CredentialsSignin: "Adresse e-mail invalide.",
+  CredentialsSignin: "Cette adresse ne correspond à aucun compte ouvert, ou le compte est désactivé.",
   Default: "La connexion a échoué. Réessayez.",
 };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ callbackUrl?: string; error?: string }> }) {
+/**
+ * Why an admission was refused.
+ *
+ * There is no sign-up form: an address nobody created is refused even with a
+ * valid Google account. Saying so plainly is kinder than a generic failure, and
+ * it tells the person who to ask.
+ */
+const DENIED: Record<string, { title: string; body: string }> = {
+  unknown: {
+    title: "Aucun compte n'est ouvert pour cette adresse",
+    body: "L'accès est accordé compte par compte : il n'y a pas d'inscription libre. Demandez à l'administrateur de la plateforme d'ouvrir un compte à cette adresse, exactement celle de votre compte Google.",
+  },
+  invited: {
+    title: "Ce compte n'est pas encore activé",
+    body: "Le compte existe mais n'a pas été activé. L'administrateur doit l'activer et ouvrir au moins un pays avant votre première connexion.",
+  },
+  suspended: {
+    title: "Ce compte est désactivé",
+    body: "Vos données sont conservées, l'accès est suspendu. Contactez l'administrateur de la plateforme pour connaître le motif et demander la réactivation.",
+  },
+};
+
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ callbackUrl?: string; error?: string; denied?: string }> }) {
   const session = await auth();
-  const { callbackUrl, error } = await searchParams;
+  const { callbackUrl, error, denied } = await searchParams;
+  const refusal = denied ? DENIED[denied] ?? DENIED.unknown : null;
   const target = callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : "/app";
   if (session?.user) redirect(target);
   const googleConfigured = Boolean(process.env.AUTH_GOOGLE_ID ?? process.env.GOOGLE_CLIENT_ID);
@@ -31,6 +54,12 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <div className="rounded-[var(--radius)] border border-border bg-surface p-6 shadow-[var(--shadow-lg)]">
           <h1 className="text-xl font-semibold tracking-tight">Connexion</h1>
           <p className="mt-1 text-sm text-fg-muted">Un compte Google suffit. Vous créerez ensuite votre premier dossier (société ou particulier).</p>
+          {refusal ? (
+            <div className="mt-4 rounded-lg bg-warning-soft p-3 text-sm">
+              <p className="flex gap-2 font-medium text-fg"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />{refusal.title}</p>
+              <p className="mt-1 pl-6 text-fg-muted">{refusal.body}</p>
+            </div>
+          ) : null}
           {error ? (
             <div className="mt-4 flex gap-2 rounded-lg bg-negative-soft p-3 text-sm text-negative"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{ERRORS[error] ?? ERRORS.Default}</div>
           ) : null}
