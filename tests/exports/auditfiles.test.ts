@@ -71,8 +71,28 @@ describe("DATEV EXTF Buchungsstapel", () => {
     expect(line!).toContain(";1503;"); // 15 March
   });
 
-  it("books a compound entry against the clearing account and says so", () => {
-    expect(out.warnings.some((w) => w.includes("BIN000002"))).toBe(true);
+  it("decomposes a compound entry without inventing a clearing account", () => {
+    // The file ends with a line break, so the split leaves a trailing blank.
+    const cells = rows.slice(2).filter((r) => r.trim() !== "").map((r) => r.split(";"));
+    expect(cells.length).toBeGreaterThan(1);
+    expect(cells.every((c) => c[7].replace(/"/g, "") !== "1590")).toBe(true);
+    expect(out.warnings.some((w) => w.includes("BIN000002"))).toBe(false);
+
+    // Every account ends with the movement the original entries gave it.
+    const net = new Map<string, number>();
+    for (const c of cells) {
+      const amount = Number(c[0].replace(",", "."));
+      const signed = c[1].replace(/"/g, "") === "S" ? amount : -amount;
+      const account = c[6].replace(/"/g, "");
+      const contra = c[7].replace(/"/g, "");
+      net.set(account, (net.get(account) ?? 0) + signed);
+      net.set(contra, (net.get(contra) ?? 0) - signed);
+    }
+    expect(net.get("1300")).toBeCloseTo(9000 - 2200, 2);
+    expect(net.get("1800")).toBeCloseTo(-9000 + 2475, 2);
+    expect(net.get("6905")).toBeCloseTo(25, 2);
+    expect(net.get("4905")).toBeCloseTo(-300, 2);
+    expect([...net.values()].reduce((a, b) => a + b, 0)).toBeCloseTo(0, 2);
   });
 
   it("encodes the euro sign as Windows-1252 and not as Latin-1", () => {

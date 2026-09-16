@@ -156,14 +156,29 @@ describe("DATEV reads back", () => {
     expect(simple[0]).toMatchObject({ amount: 9000, sign: "S", account: "1300", contra: "1800" });
   });
 
-  it("balances a compound entry across the clearing account it had to use", () => {
+  /**
+   * The compound entry (2 475 + 25 debit against 2 200 + 300 credit) has no
+   * single-line representation. Walking both sides pairs 2 200 and then 275 of
+   * the first debit line, then 25 of the second, using no clearing account at
+   * all. What has to survive is each account's net movement.
+   */
+  it("decomposes a compound entry without inventing a clearing account", () => {
     const compound = bookings.filter((b) => b.piece === "P-E2");
-    expect(compound.length).toBe(4);
-    expect(compound.every((b) => b.contra === "1590")).toBe(true);
-    const debit = compound.filter((b) => b.sign === "S").reduce((a, b) => a + b.amount, 0);
-    const credit = compound.filter((b) => b.sign === "H").reduce((a, b) => a + b.amount, 0);
-    expect(debit.toFixed(2)).toBe(credit.toFixed(2));
-    expect(out.warnings.some((w) => w.includes("E2"))).toBe(true);
+    expect(compound.every((b) => b.contra !== "1590")).toBe(true);
+    expect(out.warnings.some((w) => w.includes("E2"))).toBe(false);
+
+    const net = new Map<string, number>();
+    for (const b of compound) {
+      const signed = b.sign === "S" ? b.amount : -b.amount;
+      net.set(b.account, (net.get(b.account) ?? 0) + signed);
+      net.set(b.contra, (net.get(b.contra) ?? 0) - signed);
+    }
+    // The same movements as the original entry, account by account.
+    expect(net.get("1800")).toBeCloseTo(2475, 2);
+    expect(net.get("6905")).toBeCloseTo(25, 2);
+    expect(net.get("1300")).toBeCloseTo(-2200, 2);
+    expect(net.get("4905")).toBeCloseTo(-300, 2);
+    expect([...net.values()].reduce((a, b) => a + b, 0)).toBeCloseTo(0, 2);
   });
 
   it("declares the period on the calendar that built it", () => {

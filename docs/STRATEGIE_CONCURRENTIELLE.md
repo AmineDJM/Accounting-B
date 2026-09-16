@@ -57,3 +57,36 @@ Pourquoi c'est un espace libre : Waltio/Koinly/Blockpit visent le particulier et
 | Concurrent qui ajoute le FEC | Avancer sur la profondeur comptable (inventaire, à-nouveaux, lettrage, export natif logiciels) et le canal cabinet |
 | Volume faible de sociétés crypto | Le particulier finance l'acquisition ; la société et le cabinet font la marge |
 | Réglementation mouvante (MiCA, DAC8, loi de finances) | Veille trimestrielle, moteur paramétrable par année fiscale, changelog réglementaire publié |
+
+---
+
+## 7. Mise à jour du 16 septembre 2026 — la position que la version multipays permet de tenir
+
+La feuille de route plaçait le multipays et le rapprochement DAC8 en défense, à 9-18 mois. Ils sont faits. Cela change la nature de l'avantage : il ne s'agit plus d'avoir une fonction de plus, mais d'occuper une position que les concurrents ne peuvent pas copier vite, parce qu'elle coûte un an de travail réglementaire avant la première ligne de code utile.
+
+### Ce qui est réellement défendable
+
+**1. Le rapprochement DAC8 comme tête de pont.** À partir de 2027, chaque contribuable européen recevra, en même temps que l'administration, un relevé de son prestataire. La question que tout le monde se posera n'est pas « combien dois-je déclarer » mais « pourquoi mon chiffre diffère de celui que l'administration a déjà ». Aucun concurrent ne répond à cette question aujourd'hui. Y répondre suppose trois choses que nous avons : les huit agrégats du schéma CARF recalculés depuis les livres, la lecture des relevés dans les formats réels, et l'explication de chaque écart en français comptable.
+
+Le détail qui fait la différence : la directive demande des montants **bruts**, le schéma XML de l'OCDE des montants **nets de frais**. Les prestataires suivront le schéma. Un outil qui ne connaît qu'une lecture affichera un écart sur chaque ligne et enverra le cabinet chercher une erreur qui n'existe pas. Nous chiffrons l'écart comme étant exactement les frais et le classons en écart mineur. C'est le genre de détail qui se voit en démonstration.
+
+**2. L'explicabilité comme réponse à la responsabilité.** Un expert-comptable engage sa responsabilité sur un chiffre qu'il signe. La question qu'il pose à un outil n'est pas « quel est le montant » mais « d'où vient-il ». Chaque montant se déplie ici jusqu'à l'opération et à l'article, et ce détail est stocké avec le calcul : il reste disponible trois ans plus tard, sans recalculer, sans que les cours aient bougé. C'est la différence entre un assistant fiscal et un outil de cabinet.
+
+**3. Douze juridictions sur un seul modèle.** Waltio couvre la France et quelques pays voisins, Blockpit l'Allemagne et l'Autriche, Koinly large mais superficiel sur la comptabilité, Cryptio la comptabilité d'entreprise sans la fiscalité personnelle. Personne ne tient à la fois le journal comptable au plan de comptes local, le fichier d'audit attendu, et l'impôt personnel sous les règles réelles, dans douze pays. Le coût d'entrée n'est pas technique, il est réglementaire : il faut lire les textes, et la plupart des pièges ne se voient qu'en les lisant (la renumérotation portugaise de mai 2026, la franchise-couperet allemande, le coût nul du staking autrichien, la date de référence néerlandaise qui est l'ouverture du 1er janvier).
+
+**4. Le cabinet comme canal, et non comme utilisateur final.** Un cabinet ne veut pas douze abonnements : il veut une liste de clients, un état d'avancement et une échéance. C'est ce que produit le portefeuille clients. Le modèle de distribution suit : le cabinet paie au dossier, revend la prestation, et l'outil ne fait jamais de « tenue de comptabilité », ce qui le maintient hors du monopole de l'article 2 de l'ordonnance de 1945.
+
+### Ce qui reste à faire pour tenir la position
+
+| Priorité | Action | Pourquoi maintenant |
+| --- | --- | --- |
+| 1 | **Faire relire les douze packs** par un confrère de chaque pays, et publier le statut | C'est le seul point qui bloque une vente. Tant qu'un pack est en DRAFT, un cabinet sérieux ne signera pas |
+| 2 | **Assurance RC professionnelle éditeur** couvrant l'erreur de calcul | La contrepartie commerciale de l'explicabilité : nous montrons le raisonnement, donc nous l'assumons |
+| 3 | **Exports natifs** vers Pennylane, Cegid, ACD, DATEV, BMD, Exact, Sage | Le CSV ouvre la porte, l'export natif garde le client |
+| 4 | **Certification portugaise** du logiciel auprès de l'Autoridade Tributária | Sans elle, le SAF-T produit porte un numéro de remplacement et ne sert qu'en interne |
+| 5 | **Veille réglementaire publiée**, avec un changelog daté par pays | Un cabinet achète autant la veille que le calcul. C'est aussi ce qui rend le produit difficile à quitter |
+| 6 | **DeFi et NFT** | Le seul trou fonctionnel qui reste face à Koinly et Blockpit |
+
+### Le prix que cette position permet
+
+Un assistant fiscal grand public se vend 50 à 300 € par an et par personne. Un outil de cabinet se vend au dossier, entre 150 et 600 € par dossier et par exercice selon le volume, avec un abonnement de cabinet au-dessus. La différence tient à une seule chose : qui porte la responsabilité. Un outil qui produit un chiffre sans raisonnement se vend au particulier ; un outil qui produit un raisonnement opposable se vend au professionnel qui le signe.

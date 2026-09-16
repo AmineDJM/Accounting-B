@@ -47,6 +47,8 @@ Les douze packs portent le statut **DRAFT** : ils sont écrits à partir des tex
 | --- | --- |
 | ![Tableau de bord](docs/screenshots/03-dashboard.png) | ![Journal](docs/screenshots/06-journal.png) |
 
+Les captures se reproduisent avec `npm run seed`, puis `npm run demo` (qui lance les calculs), puis `npx tsx scripts/screenshots.ts`.
+
 Le fichier [`docs/demo-FEC-2025.txt`](docs/demo-FEC-2025.txt) est le FEC produit sur les données de démonstration (exercice 2025 de la société fictive « Nova Digital SAS », SIREN fictif).
 
 ## Pile technique

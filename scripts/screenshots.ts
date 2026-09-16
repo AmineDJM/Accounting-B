@@ -33,17 +33,13 @@ async function main() {
   // A computed result, because an empty tax page shows none of the point of
   // the product: the trace under each figure.
   await page.goto(`${BASE}/app/${entityId}/tax`); await page.waitForLoadState("networkidle");
-  const alreadyComputed = await page.locator("text=Comment ce montant est obtenu").count();
-  if (!alreadyComputed) {
-    // The button says "Calculer" the first time and "Recalculer" afterwards;
-    // it is replaced while the job runs, so a detached element is expected.
-    await page.locator("button", { hasText: /^Calculer$|^Recalculer$/ }).first().click().catch(() => {});
-    await page.waitForSelector("text=Comment ce montant est obtenu", { timeout: 120000 }).catch(() => {});
-    await page.waitForTimeout(2500);
-    await page.reload(); await page.waitForLoadState("networkidle"); await page.waitForTimeout(800);
-  }
+  // `scripts/demo-compute.ts` runs the calculations beforehand, so the page
+  // only has to load. Driving the button from here was flaky: a job that takes
+  // half a minute outlives the click.
+  const computed = await page.locator("text=Comment ce montant est obtenu").count();
+  if (!computed) console.warn("tax page has no stored result — run `npx tsx scripts/demo-compute.ts` first");
   await page.screenshot({ path: `${OUT}/07-tax.png`, fullPage: true });
-  console.log("captured tax with result");
+  console.log(`captured tax${computed ? " with result" : " (empty)"}`);
 
   // The practice cockpit and the country picker are not entity pages.
   await page.goto(`${BASE}/app/clients`); await page.waitForLoadState("networkidle"); await page.waitForTimeout(400);

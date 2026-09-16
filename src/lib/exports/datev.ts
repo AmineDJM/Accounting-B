@@ -1,4 +1,4 @@
-import { cents, ZERO, type Decimal } from "@/lib/engine/money";
+import { cents, Decimal, ZERO } from "@/lib/engine/money";
 import type { JournalEntry, JournalLine } from "@/lib/engine/journal";
 import { zonedParts } from "@/lib/engine/tz";
 import { checkPeriod } from "./period";
@@ -71,18 +71,24 @@ interface Booking {
 /**
  * Turns an n-line entry into DATEV bookings.
  *
- * A two-line entry maps one-to-one. A "one against many" entry pivots on the
- * single line and books every other line against it, which is exactly how an
- * accountant would enter it. An entry with several lines on both sides has no
- * faithful single-line representation, so each line is booked against the
- * clearing account and a warning names the entry: silently inventing a pairing
- * would move real amounts between accounts.
+ * DATEV has no concept of a compound entry: a booking is one amount, one
+ * account, one contra account. A two-line entry maps straight across, and a
+ * "one against many" entry pivots on the single line.
+ *
+ * An entry with several lines on both sides — which a swap booking tokens in,
+ * tokens out, a fee and a result routinely is — has no single-line
+ * representation. Rather than route every line through a clearing account,
+ * which produces an import a practice has to unpick by hand, the two sides are
+ * walked together and each step books the smaller of the two remaining
+ * amounts. That splits at most one line in two and preserves every account's
+ * net movement exactly, which is the property that matters: the trial balance
+ * after import is identical to the one before.
  */
 function toBookings(entry: JournalEntry, clearing: string, warnings: string[]): Booking[] {
   const debits = entry.lines.filter((l) => l.debit.gt(0));
   const credits = entry.lines.filter((l) => l.credit.gt(0));
-  const make = (line: JournalLine, contra: string, sign: "S" | "H"): Booking => ({
-    amount: sign === "S" ? line.debit : line.credit,
+  const make = (line: JournalLine, contra: string, sign: "S" | "H", amount: Decimal): Booking => ({
+    amount,
     sign,
     account: line.account,
     contra,
@@ -93,12 +99,42 @@ function toBookings(entry: JournalEntry, clearing: string, warnings: string[]): 
     currencyAmount: line.currencyAmount,
   });
 
-  if (debits.length === 1 && credits.length === 1) return [make(debits[0], credits[0].account, "S")];
-  if (debits.length === 1 && credits.length > 1) return credits.map((c) => make(c, debits[0].account, "H"));
-  if (credits.length === 1 && debits.length > 1) return debits.map((d) => make(d, credits[0].account, "S"));
+  if (debits.length === 1 && credits.length === 1) return [make(debits[0], credits[0].account, "S", debits[0].debit)];
+  if (debits.length === 1 && credits.length > 1) return credits.map((c) => make(c, debits[0].account, "H", c.credit));
+  if (credits.length === 1 && debits.length > 1) return debits.map((d) => make(d, credits[0].account, "S", d.debit));
 
-  warnings.push(`Écriture ${entry.num} (${entry.label}) : ${debits.length} lignes au débit et ${credits.length} au crédit. DATEV ne connaît pas l'écriture à lignes multiples des deux côtés : chaque ligne est passée contre le compte d'attente ${clearing}, à solder à l'import.`);
-  return [...debits.map((d) => make(d, clearing, "S")), ...credits.map((c) => make(c, clearing, "H"))];
+  if (!debits.length || !credits.length) {
+    warnings.push(`Écriture ${entry.num} (${entry.label}) : aucun contre-compte exploitable, les lignes sont passées contre le compte d'attente ${clearing}.`);
+    return [
+      ...debits.map((d) => make(d, clearing, "S", d.debit)),
+      ...credits.map((c) => make(c, clearing, "H", c.credit)),
+    ];
+  }
+
+  // Walk both sides, booking the smaller remaining amount each time.
+  const out: Booking[] = [];
+  let i = 0;
+  let j = 0;
+  let left = debits[0].debit;
+  let right = credits[0].credit;
+  let guard = 0;
+  while (i < debits.length && j < credits.length && guard++ < 1000) {
+    const amount = Decimal.min(left, right);
+    if (amount.gt(0)) out.push(make(debits[i], credits[j].account, "S", amount));
+    left = left.minus(amount);
+    right = right.minus(amount);
+    if (left.lte(0) && ++i < debits.length) left = debits[i].debit;
+    else if (left.lte(0)) break;
+    if (right.lte(0) && ++j < credits.length) right = credits[j].credit;
+    else if (right.lte(0)) break;
+  }
+
+  const booked = out.reduce((a, b) => a.plus(b.amount), ZERO);
+  const total = debits.reduce((a, l) => a.plus(l.debit), ZERO);
+  if (!booked.eq(total)) {
+    warnings.push(`Écriture ${entry.num} (${entry.label}) : décomposition incomplète (${booked.toFixed(2)} sur ${total.toFixed(2)}). Vérifiez l'équilibre de l'écriture d'origine.`);
+  }
+  return out;
 }
 
 export function exportDatev(input: AuditFileInput): AuditFileOutput {
