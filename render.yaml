@@ -1,0 +1,43 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# One web service (Next.js, long-lived Node process: background syncs run in-process)
+# and one managed PostgreSQL database. Deploy from the Render dashboard with "New > Blueprint".
+services:
+  - type: web
+    name: chainbook
+    runtime: node
+    region: frankfurt            # EU region: Binance/Coinbase APIs refuse some US IPs (HTTP 451)
+    plan: starter                # free instances sleep; syncs need a persistent process
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: chainbook-db
+          property: connectionString
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: APP_ENCRYPTION_KEY
+        generateValue: true
+      - key: AUTH_URL
+        sync: false               # https://<your-service>.onrender.com (set after the first deploy)
+      - key: AUTH_GOOGLE_ID
+        sync: false
+      - key: AUTH_GOOGLE_SECRET
+        sync: false
+      - key: AUTH_DEV_LOGIN
+        value: "false"
+      - key: DB_AUTO_MIGRATE
+        value: "true"
+      - key: COINGECKO_API_KEY
+        sync: false
+databases:
+  - name: chainbook-db
+    plan: basic-256mb
+    region: frankfurt
+    postgresMajorVersion: "16"
