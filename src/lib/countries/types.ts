@@ -150,6 +150,13 @@ export interface WealthRules {
   kind: "WEALTH";
   /** Valuation date within the year. */
   referenceDate: { month: number; day: number };
+  /**
+   * Which end of the reference day counts. Switzerland values the position at
+   * the close of 31 December; the Dutch peildatum of 1 January is the position
+   * at the start of that day, so a purchase made on 1 January is after it. The
+   * difference is a whole day of trading and it changes the amount declared.
+   */
+  referenceMoment?: "START_OF_DAY" | "END_OF_DAY";
   referenceLabel: LocalizedText;
   /** Capital gains on private assets are exempt. */
   capitalGainsExempt: boolean;

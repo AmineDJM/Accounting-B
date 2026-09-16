@@ -26,9 +26,11 @@ export function wealthEngine(input: TaxComputationInput, pack: CountryPack): Tax
   const warnings: TaxComputationResult["warnings"] = [];
   const events: TaxableEvent[] = [];
   const income: IncomeItem[] = [];
+  const tz = pack.timezone;
+  const atStart = rules.referenceMoment === "START_OF_DAY";
   const assumptions = [
     "Les quantités détenues sont reconstituées à partir des comptes importés et des avoirs externes déclarés.",
-    `Position évaluée au ${String(rules.referenceDate.day).padStart(2, "0")}/${String(rules.referenceDate.month).padStart(2, "0")} de chaque année, au dernier cours disponible.`,
+    `Position évaluée au ${String(rules.referenceDate.day).padStart(2, "0")}/${String(rules.referenceDate.month).padStart(2, "0")} de chaque année, ${atStart ? "à l'ouverture de cette journée" : "à la clôture de cette journée"}, au dernier cours disponible.`,
   ];
 
   const ledger = new LotLedger({ method: "FIFO" });
@@ -76,18 +78,26 @@ export function wealthEngine(input: TaxComputationInput, pack: CountryPack): Tax
 
   // --- wealth snapshots ---------------------------------------------------
   const externals = new Map(Object.entries(input.externalHoldings ?? {}).map(([k, v]) => [k.toUpperCase(), D(v)]));
-  const activityYears = [...new Set(holdingsOverTime.map((h) => zonedYear(h.at)))].sort((a, b) => a - b);
-  const lastYear = zonedYear(input.now ?? new Date());
+  const activityYears = [...new Set(holdingsOverTime.map((h) => zonedYear(h.at, tz)))].sort((a, b) => a - b);
+  const lastYear = zonedYear(input.now ?? new Date(), tz);
   const snapYears: number[] = [];
   for (let y = (activityYears[0] ?? lastYear); y <= lastYear; y++) snapYears.push(y);
   const wealth: WealthSnapshot[] = [];
 
   for (const year of snapYears.filter((y) => !input.years || input.years.includes(y))) {
-    const at = zonedMidnight(year, rules.referenceDate.month, rules.referenceDate.day + 1);
-    const cutoff = new Date(at.getTime() - 1);
+    // Quantity and price are two separate questions. The quantity is the one
+    // held at the reference moment: the opening of the reference day where the
+    // law fixes a peildatum, so a trade made that day is outside the base, and
+    // its close where the law values a year-end position. The price is the one
+    // quoted on the reference date itself in both cases — looking it up at
+    // local midnight would systematically return the previous day's close for
+    // any time zone east of UTC.
+    const at = zonedMidnight(year, rules.referenceDate.month, rules.referenceDate.day + (atStart ? 0 : 1), tz);
+    const priceAt = new Date(zonedMidnight(year, rules.referenceDate.month, rules.referenceDate.day + 1, tz).getTime() - 1);
+    const cutoff = atStart ? at : new Date(at.getTime() - 1);
     const qtyByAsset = new Map<string, Decimal>(externals);
     for (const h of holdingsOverTime) {
-      if (h.at > cutoff) continue;
+      if (h.at >= at) continue;
       qtyByAsset.set(h.asset, (qtyByAsset.get(h.asset) ?? ZERO).plus(h.delta));
     }
     const lines: WealthSnapshot["holdings"] = [];
@@ -95,7 +105,7 @@ export function wealthEngine(input: TaxComputationInput, pack: CountryPack): Tax
     let total = ZERO;
     for (const [asset, q] of [...qtyByAsset.entries()].sort()) {
       if (q.lte("1e-12") || isMoney(asset)) continue;
-      const quote = input.prices.get(asset, cutoff);
+      const quote = input.prices.get(asset, priceAt);
       if (!quote) { missing.push(asset); lines.push({ asset, qty: q, unitValue: null, value: ZERO, source: "cours manquant" }); continue; }
       const value = q.mul(quote.priceEur);
       total = total.plus(value);
@@ -145,8 +155,8 @@ export function wealthEngine(input: TaxComputationInput, pack: CountryPack): Tax
   // --- yearly summaries (income + informational gains) ---------------------
   const years: YearSummary[] = [];
   for (const w of wealth) {
-    const yearIncome = income.filter((i) => zonedYear(i.date) === w.year);
-    const yearEvents = events.filter((e) => zonedYear(e.date) === w.year);
+    const yearIncome = income.filter((i) => zonedYear(i.date, tz) === w.year);
+    const yearEvents = events.filter((e) => zonedYear(e.date, tz) === w.year);
     const incomeTotal = yearIncome.reduce((a, i) => a.plus(i.valueBase), ZERO);
     const gains = yearEvents.filter((e) => e.gain.gt(0)).reduce((a, e) => a.plus(e.gain), ZERO);
     const losses = yearEvents.filter((e) => e.gain.lt(0)).reduce((a, e) => a.plus(e.gain.abs()), ZERO);
@@ -184,7 +194,12 @@ export function wealthEngine(input: TaxComputationInput, pack: CountryPack): Tax
     events, income, years, wealth,
     warnings,
     refs: dedupeRefs([...(pack.refs ?? []), ...collectRefs(years.map((y) => y.trace))]),
-    assumptions: [...assumptions, ...rules.businessTest.map((b) => pick(b, locale))],
+    assumptions: [
+      ...(pack.assumptions ?? []).map((a) => pick(a, locale)),
+      ...assumptions,
+      ...rules.businessTest.map((b) => pick(b, locale)),
+      ...(rules.qualificationTest ? rules.qualificationTest.declarative.map((d) => pick(d, locale)) : []),
+    ],
     computedAt: input.now ?? new Date(),
   };
 }

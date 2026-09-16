@@ -226,3 +226,41 @@ export const IFRS_GENERIC = chart({
 });
 
 export { chart as buildChart, a as account };
+
+/**
+ * Netherlands — Referentiegrootboekschema (RGS), the reference chart the Dutch
+ * tax authority and the accounting software vendors share. Crypto-assets sit in
+ * the financial fixed assets or, for a trading position, under the securities
+ * of the current assets; the numbers below follow the RGS decimal layout.
+ */
+export const RGS_NL = chart({
+  bank: a("102010", "Bankrekeningen — rekening-courant"),
+  internalTransfer: a("103010", "Kruisposten"),
+  exchangeFiatPrefix: "1021",
+  exchangeForeignFiatPrefix: "1022",
+  tokensPrefix: "115",
+  feesFiat: a("430120", "Bankkosten"),
+  feesTrading: a("430130", "Transactiekosten cryptoactiva"),
+  feesNetwork: a("430140", "Netwerkkosten (on-chain)"),
+  gainOnTokens: a("845010", "Opbrengst van vorderingen en effecten — cryptoactiva"),
+  lossOnTokens: a("845020", "Waardeverminderingen van effecten — cryptoactiva"),
+  fxGain: a("845030", "Valutakoersverschillen — winst"),
+  fxLoss: a("845040", "Valutakoersverschillen — verlies"),
+  tokenIncome: a("845050", "Overige financiële baten — staking en rewards"),
+  suppliers: a("160010", "Crediteuren"),
+  customers: a("130010", "Debiteuren"),
+  ownerAccount: a("175010", "Rekening-courant directie"),
+  miscExpense: a("470010", "Overige bedrijfskosten"),
+  miscIncome: a("840010", "Overige bedrijfsopbrengsten"),
+  suspense: a("109010", "Tussenrekening — nog te classificeren"),
+  valuationLossAsset: a("115900", "Waardevermindering cryptoactiva"),
+  valuationGainLiability: a("115910", "Terugneming waardevermindering cryptoactiva"),
+  provisionRisk: a("155010", "Voorziening waardevermindering cryptoactiva"),
+  provisionCharge: a("845060", "Dotatie voorziening cryptoactiva"),
+  provisionReversal: a("845070", "Vrijval voorziening cryptoactiva"),
+  fxConversionLoss: a("845080", "Omrekeningsverschillen — verlies"),
+  fxConversionGain: a("845090", "Omrekeningsverschillen — winst"),
+  fxProvision: a("155020", "Voorziening valutarisico"),
+  roundingExpense: a("470020", "Afrondingsverschillen — kosten"),
+  roundingIncome: a("840020", "Afrondingsverschillen — opbrengsten"),
+});

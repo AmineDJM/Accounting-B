@@ -187,7 +187,14 @@ export function gainsEngine(input: TaxComputationInput, pack: CountryPack): TaxC
     wealth: [],
     warnings,
     refs,
-    assumptions,
+    // The pack's own assumptions come first: they are what a professional has
+    // to check, and they are written by the person who read the law, not
+    // derived from the data.
+    assumptions: [
+      ...(pack.assumptions ?? []).map((a) => pick(a, locale)),
+      ...(rules.caveats ?? []).map((c) => pick(c, locale)),
+      ...assumptions,
+    ],
     computedAt: input.now ?? new Date(),
   };
 }
@@ -490,7 +497,9 @@ function summarise(
       losses,
       netGain: netBeforeCarry,
       taxableBase: cents(taxable),
-      estimatedTax: tax ? cents(tax) : taxable.isZero() ? ZERO : null,
+      // A jurisdiction without a personal income tax shows its notice, never a
+      // figure: a zero would read as a computation rather than as an absence.
+      estimatedTax: rules.noPersonalTax ? null : tax ? cents(tax) : taxable.isZero() ? ZERO : null,
       taxBreakdown: breakdown.map((b) => ({ ...b, amount: cents(b.amount) })),
       incomeTotal: cents(incomeTotal),
       incomeTaxable: cents(incomeTaxable),
