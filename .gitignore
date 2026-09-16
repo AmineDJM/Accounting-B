@@ -44,3 +44,6 @@ next-env.d.ts
 # local data (embedded PostgreSQL) and playwright artefacts
 /.data/
 /test-results/
+
+# scratch capture scripts
+.preview*.mjs

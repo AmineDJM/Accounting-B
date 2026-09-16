@@ -7,6 +7,8 @@ import { IMPERSONATION_COOKIE, IMPERSONATION_TTL_MS, PlatformError, startImperso
 import {
   createAccount, setAccountCountries, setAccountNote, setAccountRole, setAccountStatus,
 } from "@/lib/services/admin";
+import { requireAdmin } from "@/lib/dal/platform";
+import { setSetting } from "@/lib/dal/settings";
 import type { AccountStatusKind, PlatformRole } from "@/lib/db/schema";
 
 export type AdminResult = { ok: true; message?: string } | { ok: false; error: string };
@@ -115,4 +117,51 @@ export async function stopViewAsAction(): Promise<void> {
   if (current) await stopImpersonation(id, current);
   jar.delete(IMPERSONATION_COOKIE);
   redirect("/admin/accounts");
+}
+
+/**
+ * The Google client, pasted from the console.
+ *
+ * An empty secret keeps the stored one, so an administrator can correct the
+ * identifier without having to fetch the secret from Google again.
+ */
+export async function saveGoogleAction(form: FormData): Promise<AdminResult> {
+  try {
+    const { id } = await requireSignedIn();
+    await requireAdmin(id);
+    if (form.get("clear")) {
+      await setSetting("google.clientId", null, id);
+      await setSetting("google.clientSecret", null, id);
+      revalidatePath("/admin/setup");
+      return { ok: true, message: "Client Google retiré." };
+    }
+    const clientId = String(form.get("clientId") ?? "").trim();
+    const clientSecret = String(form.get("clientSecret") ?? "").trim();
+    if (!clientId) return { ok: false, error: "Indiquez l'identifiant client." };
+    if (!clientId.endsWith(".apps.googleusercontent.com")) {
+      return { ok: false, error: "Cet identifiant ne ressemble pas à un client Google (il finit par .apps.googleusercontent.com)." };
+    }
+    await setSetting("google.clientId", clientId, id);
+    if (clientSecret) await setSetting("google.clientSecret", clientSecret, id);
+    revalidatePath("/admin/setup");
+    revalidatePath("/login");
+    return { ok: true, message: clientSecret ? "Connexion Google configurée." : "Identifiant enregistré (secret inchangé)." };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function saveCoingeckoAction(form: FormData): Promise<AdminResult> {
+  try {
+    const { id } = await requireSignedIn();
+    await requireAdmin(id);
+    const clear = Boolean(form.get("clear"));
+    const key = String(form.get("apiKey") ?? "").trim();
+    if (!clear && !key) return { ok: false, error: "Collez une clé, ou retirez celle qui est enregistrée." };
+    await setSetting("coingecko.apiKey", clear ? null : key, id);
+    revalidatePath("/admin/setup");
+    return { ok: true, message: clear ? "Clé retirée." : "Clé enregistrée." };
+  } catch (e) {
+    return fail(e);
+  }
 }

@@ -11,9 +11,18 @@ const dayKey = (d: Date) => d.toISOString().slice(0, 10);
 
 export interface PricingNeed { asset: string; at: Date }
 
-export function defaultProviders(): PriceProvider[] {
+/**
+ * The price sources, in the order they are tried.
+ *
+ * The CoinGecko key is a parameter rather than an environment read, because it
+ * may come from the console instead: a deployment starts with no key at all and
+ * the free tier answers, and an administrator can add one later without a
+ * redeployment.
+ */
+export function defaultProviders(opts: { coingeckoApiKey?: string | null } = {}): PriceProvider[] {
   const list: PriceProvider[] = [new BinanceKlinesProvider(), new EcbFxProvider()];
-  if (process.env.COINGECKO_ENABLED !== "false") list.push(new CoinGeckoProvider({ apiKey: process.env.COINGECKO_API_KEY }));
+  const key = opts.coingeckoApiKey ?? process.env.COINGECKO_API_KEY;
+  if (process.env.COINGECKO_ENABLED !== "false") list.push(new CoinGeckoProvider({ apiKey: key ?? undefined }));
   return list;
 }
 

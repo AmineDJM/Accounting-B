@@ -1,6 +1,15 @@
 # Render Blueprint — https://render.com/docs/blueprint-spec
-# One web service (Next.js, long-lived Node process: background syncs run in-process)
-# and one managed PostgreSQL database. Deploy from the Render dashboard with "New > Blueprint".
+#
+# Nothing to fill in. Render creates the database, generates the secrets and
+# starts the service; the first administrator then claims the platform with
+# ADMIN_BOOTSTRAP_CODE (Environment tab) and finishes the setup from
+# /admin/setup — Google sign-in included, with no redeployment.
+#
+# Deliberately absent:
+#   AUTH_URL          Auth.js derives it from the request (trustHost).
+#   AUTH_GOOGLE_*     pasted into the console, stored encrypted in the database.
+#   SUPER_ADMIN_EMAILS optional; the start-up code covers the first sign-in.
+#   COINGECKO_API_KEY  optional; the console takes it too.
 services:
   - type: web
     name: finly
@@ -21,23 +30,15 @@ services:
           name: finly-db
           property: connectionString
       - key: AUTH_SECRET
-        generateValue: true
+        generateValue: true       # signs the session cookies
       - key: APP_ENCRYPTION_KEY
-        generateValue: true
-      - key: AUTH_URL
-        sync: false               # https://<your-service>.onrender.com (set after the first deploy)
-      - key: AUTH_GOOGLE_ID
-        sync: false
-      - key: AUTH_GOOGLE_SECRET
-        sync: false
+        generateValue: true       # encrypts exchange API keys at rest (AES-256-GCM)
+      - key: ADMIN_BOOTSTRAP_CODE
+        generateValue: true       # read it here once, on the first sign-in
       - key: AUTH_DEV_LOGIN
-        value: "false"
-      - key: SUPER_ADMIN_EMAILS
-        sync: false               # first administrator(s); nobody else can sign up
+        value: "false"            # never true on a deployment that faces clients
       - key: DB_AUTO_MIGRATE
         value: "true"
-      - key: COINGECKO_API_KEY
-        sync: false
 databases:
   - name: finly-db
     plan: basic-256mb

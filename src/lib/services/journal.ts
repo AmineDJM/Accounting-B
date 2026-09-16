@@ -9,7 +9,8 @@ import { generateJournal, type JournalEntry, type JournalResult } from "@/lib/en
 import { valueTransactions } from "@/lib/engine/valuation";
 import { buildFecRows } from "@/lib/engine/fecbuild";
 import { fecFileName, serializeFec, validateFec, type FecValidationReport } from "@/lib/engine/fec";
-import { pricingNeeds, PricingService } from "@/lib/pricing/service";
+import { defaultProviders, pricingNeeds, PricingService } from "@/lib/pricing/service";
+import { coingeckoKey } from "@/lib/dal/settings";
 import { listAccounts } from "@/lib/dal/accounts";
 import { requireEntity, type Entity, type FiscalYear } from "@/lib/dal/entities";
 import { createJob, spawn, type Job } from "@/lib/dal/jobs";
@@ -38,7 +39,7 @@ export async function prepareValuation(entityId: string, entity: Entity, closing
     ctx.currency,
     "USD",
   ])].filter((a) => a !== "EUR");
-  const pricing = new PricingService(db, undefined, log);
+  const pricing = new PricingService(db, defaultProviders({ coingeckoApiKey: await coingeckoKey() }), log);
   await progress?.(10, `Cours de ${assets.length} actifs…`);
   const needs = pricingNeeds(txs, closingDates, assets);
   const { fetched, missing } = await pricing.ensure(needs);

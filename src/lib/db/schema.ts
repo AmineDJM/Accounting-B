@@ -479,3 +479,21 @@ export const taxRuns = pgTable(
   },
   (t) => [index("tax_runs_entity_idx").on(t.entityId, t.createdAt)],
 );
+
+/* ------------------------------------------------- Platform settings */
+/**
+ * Settings an administrator sets from the console rather than from the
+ * environment, so a deployment needs nothing typed into it at creation time.
+ *
+ * A value is either plain (`value`) or encrypted at rest (`secretEnc`, the
+ * same AES-256-GCM envelope as exchange keys). `hint` holds the last few
+ * characters of a secret, which is all the browser ever receives.
+ */
+export const platformSettings = pgTable("platform_settings", {
+  key: varchar("key", { length: 64 }).primaryKey(),
+  value: text("value"),
+  secretEnc: text("secret_enc"),
+  hint: varchar("hint", { length: 16 }),
+  updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});

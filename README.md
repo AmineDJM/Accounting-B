@@ -131,7 +131,21 @@ Sans `DATABASE_URL`, une base PostgreSQL embarquée (PGlite) est créée dans `.
 
 ## Déploiement sur Render
 
-Le fichier [`render.yaml`](render.yaml) décrit un service web Node (région Francfort) et une base PostgreSQL managée. Dans le tableau de bord Render : *New → Blueprint*, choisir ce dépôt, puis renseigner `AUTH_URL` (URL publique du service), `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` et `SUPER_ADMIN_EMAILS` (sans quoi personne ne peut se connecter : il n'y a pas d'inscription libre). `AUTH_SECRET`, `APP_ENCRYPTION_KEY` et `DATABASE_URL` sont générés automatiquement ; les migrations s'appliquent au démarrage.
+**Rien à renseigner.** Dans le tableau de bord Render : *New → Blueprint*, choisir ce dépôt, *Deploy*. Le blueprint [`render.yaml`](render.yaml) crée la base PostgreSQL, génère les secrets et démarre le service ; les migrations s'appliquent au démarrage.
+
+Ensuite, deux minutes :
+
+1. **Prenez la main.** Render → service `finly` → *Environment* → copiez `ADMIN_BOOTSTRAP_CODE`. Ouvrez l'URL du service : l'écran de connexion demande ce code, et vous devenez administrateur de la plateforme. Le code cesse de fonctionner dès qu'un administrateur existe.
+2. **Finissez depuis la console.** *Administration → Installation* liste ce qui manque encore et affiche l'URI de redirection à coller chez Google. Vous y collez l'identifiant et le secret du client OAuth : la connexion Google fonctionne à la requête suivante, sans redéploiement. Le client est chiffré en base, comme les clés d'échange.
+
+Ce qui n'est **pas** demandé, et pourquoi :
+
+| Variable | Pourquoi elle a disparu |
+| --- | --- |
+| `AUTH_URL` | Auth.js déduit son URL de la requête (`trustHost`), donc le service fonctionne sur le nom d'hôte que Render lui donne. |
+| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | Se collent dans la console. Renseignées dans l'environnement, elles l'emportent. |
+| `SUPER_ADMIN_EMAILS` | Le code de démarrage suffit au premier administrateur. La variable reste utilisable. |
+| `COINGECKO_API_KEY` | Facultative ; la console la prend aussi. |
 
 Pourquoi Francfort : Binance refuse les requêtes depuis certaines adresses IP (HTTP 451, observé depuis un conteneur américain pendant le développement). Les synchronisations tournent dans le processus web (Render conserve un processus persistant) ; sur une plateforme serverless il faudrait une file de tâches.
 
@@ -149,7 +163,12 @@ Deux rôles seulement, et un seul crée des comptes :
 | Voir les dossiers d'un autre compte | non | oui, en lecture seule et journalisé |
 | Voir les mesures de la plateforme | non | oui |
 
-**Le premier administrateur** vient de l'environnement : `SUPER_ADMIN_EMAILS` (adresses séparées par des virgules) est créé et promu à la première connexion. L'environnement fait autorité — une adresse qui y figure retrouve ses droits même si la ligne en base dit le contraire, ce qui évite de se verrouiller dehors. Une fois le premier administrateur en place, la variable peut être vidée.
+**Le premier administrateur** ne peut pas être créé par un administrateur, alors il y a deux portes :
+
+- **Le code de démarrage** (`ADMIN_BOOTSTRAP_CODE`, douze caractères au minimum, généré par le blueprint Render) : sur l'écran de connexion, celui qui le détient prend la main. La porte se ferme d'elle-même dès qu'un administrateur actif existe, les tentatives sont limitées à cinq par adresse et par dix minutes, et la comparaison se fait en temps constant.
+- **`SUPER_ADMIN_EMAILS`** (adresses séparées par des virgules) : créées et promues à chaque connexion. L'environnement fait autorité — une adresse qui y figure retrouve ses droits même si la ligne en base dit le contraire, ce qui évite de se verrouiller dehors.
+
+L'écran **Administration → Installation** dit à tout moment ce qui manque : base managée ou embarquée, clé de chiffrement, connexion Google, nombre d'administrateurs, mode démonstration, source de cours.
 
 **Les quatre états d'un compte** : `INVITED` (créé, pas encore activé — la connexion est refusée), `ACTIVE`, `SUSPENDED` (refusée, avec le motif), et la suppression, qui n'existe pas : un compte désactivé conserve ses dossiers et son journal d'audit.
 

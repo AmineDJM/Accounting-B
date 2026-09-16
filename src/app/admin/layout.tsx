@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Activity, LayoutDashboard, ScrollText, ShieldCheck, Users } from "lucide-react";
+import { Activity, LayoutDashboard, ScrollText, ShieldCheck, SlidersHorizontal, Users } from "lucide-react";
 import { requireSignedIn } from "@/auth";
 import { requireAdmin } from "@/lib/dal/platform";
 import { Logo } from "@/components/logo";
@@ -29,6 +29,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: "/admin/accounts", label: "Comptes", icon: Users },
     { href: "/admin/activity", label: "Activité", icon: Activity },
     { href: "/admin/audit", label: "Journal d'audit", icon: ScrollText },
+    { href: "/admin/setup", label: "Installation", icon: SlidersHorizontal },
   ];
 
   return (

@@ -1,63 +1,104 @@
 import NextAuth, { type NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
+import Google from "next-auth/providers/google";
 import { authConfig, devLoginEnabled } from "./auth.config";
 import { getDb } from "@/lib/db";
 import { accounts, sessions, users, verificationTokens } from "@/lib/db/schema";
-import { admitSignIn, resolveActor, touch, type Actor } from "@/lib/dal/platform";
+import { admitSignIn, claimPlatform, resolveActor, touch, type Actor } from "@/lib/dal/platform";
+import { googleCredentials } from "@/lib/dal/settings";
 
 /**
  * Full Auth.js instance: Google sign-in persisted through the Drizzle adapter,
- * plus an optional "demo login" (email only) enabled with AUTH_DEV_LOGIN=true
- * for local development, tests and screenshots. Never enable it in production.
+ * a start-up door for the very first administrator, and an optional "demo
+ * login" (email only) enabled with AUTH_DEV_LOGIN=true for local development,
+ * tests and screenshots. Never enable that last one in production.
+ *
+ * The configuration is built per request rather than at import time, because
+ * the Google client may live in the database: an administrator pastes it into
+ * the console and sign-in starts working on the next request, with no
+ * redeployment and nothing to type when the service is first created.
  *
  * There is no self-service sign-up. An address that no administrator created is
  * refused even with a valid Google account, and a suspended one is refused
- * until it is reactivated. The only exception is a bootstrap administrator
- * named in SUPER_ADMIN_EMAILS, because the first administrator cannot be
- * created by an administrator.
+ * until it is reactivated. The exceptions are the addresses in
+ * SUPER_ADMIN_EMAILS and the holder of the start-up code, because the first
+ * administrator cannot be created by an administrator.
  */
 const db = await getDb();
 
-const providers: NextAuthConfig["providers"] = [...authConfig.providers];
-if (devLoginEnabled) {
-  providers.push(
-    Credentials({
-      id: "dev-login",
-      name: "Connexion de démonstration",
-      credentials: { email: { label: "E-mail", type: "email" }, name: { label: "Nom", type: "text" } },
-      async authorize(creds) {
-        const email = String(creds?.email ?? "").trim().toLowerCase();
-        if (!email || !email.includes("@")) return null;
-        // The demo login takes the same door as Google: it skips the password,
-        // not the admission rules.
-        const admitted = await admitSignIn(email, { name: String(creds?.name ?? "") || null });
-        if (!admitted.ok) return null;
-        return { id: admitted.user.id, email: admitted.user.email, name: admitted.user.name, image: admitted.user.image };
-      },
-    }),
-  );
-}
+/** Providers that carry their own admission check, so `signIn` lets them past. */
+const SELF_ADMITTED = new Set(["dev-login", "bootstrap"]);
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  ...authConfig,
-  adapter: DrizzleAdapter(db, { usersTable: users, accountsTable: accounts, sessionsTable: sessions, verificationTokensTable: verificationTokens }),
-  providers,
-  callbacks: {
-    ...authConfig.callbacks,
-    async signIn({ user, account, profile }) {
-      // The credentials provider already ran `admitSignIn` in `authorize`.
-      if (account?.provider === "dev-login") return true;
-      const admitted = await admitSignIn(user.email, { name: profile?.name ?? user.name, image: (profile?.picture as string | undefined) ?? user.image });
-      if (admitted.ok) {
-        user.id = admitted.user.id;
-        return true;
-      }
-      // The reason reaches the login page as a query parameter, so a person
-      // refused for the wrong reason knows who to ask.
-      return `/login?denied=${admitted.reason.toLowerCase()}`;
-    },
+const devLogin = Credentials({
+  id: "dev-login",
+  name: "Connexion de démonstration",
+  credentials: { email: { label: "E-mail", type: "email" }, name: { label: "Nom", type: "text" } },
+  async authorize(creds) {
+    const email = String(creds?.email ?? "").trim().toLowerCase();
+    if (!email || !email.includes("@")) return null;
+    // The demo login takes the same door as Google: it skips the password,
+    // not the admission rules.
+    const admitted = await admitSignIn(email, { name: String(creds?.name ?? "") || null });
+    if (!admitted.ok) return null;
+    return { id: admitted.user.id, email: admitted.user.email, name: admitted.user.name, image: admitted.user.image };
   },
+});
+
+/**
+ * The start-up door.
+ *
+ * It opens only while the platform has no administrator, and it closes by
+ * itself the moment one exists. `claimPlatform` does the checking; a wrong code
+ * and a closed window return the same nothing.
+ */
+const bootstrapLogin = Credentials({
+  id: "bootstrap",
+  name: "Code de démarrage",
+  credentials: { email: { label: "E-mail", type: "email" }, code: { label: "Code de démarrage", type: "password" }, name: { label: "Nom", type: "text" } },
+  async authorize(creds) {
+    const admin = await claimPlatform(String(creds?.email ?? ""), String(creds?.code ?? ""), { name: String(creds?.name ?? "") || null });
+    if (!admin) return null;
+    return { id: admin.id, email: admin.email, name: admin.name, image: admin.image };
+  },
+});
+
+export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
+  const providers: NextAuthConfig["providers"] = [];
+  const google = await googleCredentials();
+  if (google.clientId && google.clientSecret) {
+    providers.push(
+      Google({
+        clientId: google.clientId,
+        clientSecret: google.clientSecret,
+        allowDangerousEmailAccountLinking: false,
+        authorization: { params: { prompt: "select_account", access_type: "online", scope: "openid email profile" } },
+      }),
+    );
+  }
+  if (devLoginEnabled) providers.push(devLogin);
+  providers.push(bootstrapLogin);
+
+  return {
+    ...authConfig,
+    adapter: DrizzleAdapter(db, { usersTable: users, accountsTable: accounts, sessionsTable: sessions, verificationTokensTable: verificationTokens }),
+    providers,
+    callbacks: {
+      ...authConfig.callbacks,
+      async signIn({ user, account, profile }) {
+        // These providers already ran their own admission check in `authorize`.
+        if (account?.provider && SELF_ADMITTED.has(account.provider)) return true;
+        const admitted = await admitSignIn(user.email, { name: profile?.name ?? user.name, image: (profile?.picture as string | undefined) ?? user.image });
+        if (admitted.ok) {
+          user.id = admitted.user.id;
+          return true;
+        }
+        // The reason reaches the login page as a query parameter, so a person
+        // refused for the wrong reason knows who to ask.
+        return `/login?denied=${admitted.reason.toLowerCase()}`;
+      },
+    },
+  };
 });
 
 export type { Actor };

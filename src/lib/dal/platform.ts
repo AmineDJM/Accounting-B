@@ -3,9 +3,10 @@ import { and, eq, gt, isNull } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { getDb } from "@/lib/db";
 import { auditLog, impersonations, users } from "@/lib/db/schema";
-import { allowedCountries, assertCanWrite, assertCountryAllowed, bootstrapAdmins, PlatformError, type Actor } from "@/lib/authz";
+import { allowedCountries, assertCanWrite, assertCountryAllowed, AttemptLimiter, bootstrapAdmins, bootstrapCode, PlatformError, type Actor } from "@/lib/authz";
+import { safeEqual } from "@/lib/security/crypto";
 
-export { allowedCountries, assertCanWrite, assertCountryAllowed, bootstrapAdmins, PlatformError };
+export { allowedCountries, assertCanWrite, assertCountryAllowed, bootstrapAdmins, bootstrapCode, PlatformError };
 export type { Actor };
 
 export type User = typeof users.$inferSelect;
@@ -182,4 +183,72 @@ export async function stopImpersonation(adminId: string, impersonationId: string
       details: { targetUserId: row.targetUserId, minutes: Math.round((Date.now() - row.startedAt.getTime()) / 60000) },
     });
   }
+}
+
+/* --------------------------------------------------------- First run */
+
+const claimLimiter = new AttemptLimiter();
+
+/**
+ * True while the platform has no administrator and a start-up code is set.
+ *
+ * The login page asks this to decide whether to offer the start-up form, and
+ * `claimPlatform` asks it again before acting, so the window closes the moment
+ * the first administrator exists.
+ */
+export async function platformNeedsBootstrap(): Promise<boolean> {
+  if (!bootstrapCode()) return false;
+  const db = await getDb();
+  const [admin] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.platformRole, "SUPER_ADMIN"), eq(users.status, "ACTIVE")))
+    .limit(1);
+  return !admin;
+}
+
+/**
+ * Claims the platform with the start-up code.
+ *
+ * Returns the new administrator, or null when the code is wrong or the window
+ * has closed — the caller shows the same message either way, so a stranger
+ * learns nothing from which it was.
+ */
+export async function claimPlatform(email: string | null | undefined, code: string, profile: { name?: string | null } = {}): Promise<User | null> {
+  const address = (email ?? "").trim().toLowerCase();
+  const expected = bootstrapCode();
+  if (!expected || !address.includes("@")) return null;
+  if (!claimLimiter.allowed(address)) {
+    throw new PlatformError("Trop de tentatives. Réessayez dans dix minutes.", "NOT_ADMIN");
+  }
+  if (!(await platformNeedsBootstrap())) return null;
+  if (!safeEqual(code.trim(), expected)) {
+    claimLimiter.fail(address);
+    return null;
+  }
+  claimLimiter.clear(address);
+
+  const db = await getDb();
+  const [existing] = await db.select().from(users).where(eq(users.email, address)).limit(1);
+  const now = new Date();
+  const [admin] = existing
+    ? await db
+        .update(users)
+        .set({ platformRole: "SUPER_ADMIN", status: "ACTIVE", activatedAt: existing.activatedAt ?? now, suspendedAt: null, suspendedReason: null })
+        .where(eq(users.id, existing.id))
+        .returning()
+    : await db
+        .insert(users)
+        .values({
+          email: address,
+          name: profile.name?.trim() || address.split("@")[0],
+          platformRole: "SUPER_ADMIN",
+          status: "ACTIVE",
+          countries: [],
+          emailVerified: now,
+          activatedAt: now,
+        })
+        .returning();
+  await db.insert(auditLog).values({ userId: admin.id, action: "platform.claim", details: { email: address } });
+  return admin;
 }

@@ -83,3 +83,47 @@ export function assertCanWrite(actor: Pick<Actor, "status" | "viewingAs">): void
     throw new PlatformError("Ce compte est désactivé.", "SUSPENDED");
   }
 }
+
+/**
+ * The start-up code.
+ *
+ * A fresh deployment has no administrator and no way to create one: the host
+ * generates this code, the operator reads it once from the hosting dashboard,
+ * and it buys exactly one thing — becoming the first administrator. It is
+ * refused outright below twelve characters, because a short code that grants
+ * the whole platform is worse than no code at all.
+ */
+export function bootstrapCode(): string | null {
+  const raw = (process.env.ADMIN_BOOTSTRAP_CODE ?? "").trim();
+  return raw.length >= 12 ? raw : null;
+}
+
+/**
+ * A fixed-window attempt limiter, per process.
+ *
+ * It exists for the start-up code, which is the one secret a stranger could try
+ * to guess. Per process is enough here: the deployment runs a single instance,
+ * and a limiter that a restart resets still turns a guessing run into days.
+ */
+export class AttemptLimiter {
+  private readonly hits = new Map<string, { count: number; since: number }>();
+
+  constructor(private readonly max = 5, private readonly windowMs = 10 * 60 * 1000) {}
+
+  /** True while the key may still try. */
+  allowed(key: string, now = Date.now()): boolean {
+    const hit = this.hits.get(key);
+    if (!hit || now - hit.since > this.windowMs) return true;
+    return hit.count < this.max;
+  }
+
+  fail(key: string, now = Date.now()): void {
+    const hit = this.hits.get(key);
+    if (!hit || now - hit.since > this.windowMs) this.hits.set(key, { count: 1, since: now });
+    else hit.count += 1;
+  }
+
+  clear(key: string): void {
+    this.hits.delete(key);
+  }
+}
