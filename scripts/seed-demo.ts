@@ -10,7 +10,8 @@ process.env.APP_ENCRYPTION_KEY ??= "demo-encryption-key-change-me-please";
 
 import { eq } from "drizzle-orm";
 import { getDb } from "../src/lib/db";
-import { entities, entityMembers, exchangeAccounts, priceCoverage, prices, users, walletAddresses } from "../src/lib/db/schema";
+import { dac8Statements, entities, entityMembers, exchangeAccounts, firmMembers, firms, fiscalYears, priceCoverage, prices, users, walletAddresses } from "../src/lib/db/schema";
+import { getPack } from "../src/lib/countries/registry";
 import { importBinanceCsv } from "../src/lib/connectors/binance/csv";
 import { upsertTransactions } from "../src/lib/dal/transactions";
 import { ensureFiscalYears } from "../src/lib/dal/entities";
@@ -45,7 +46,9 @@ function demoCsv(): string {
 /** Smooth synthetic daily price curves (EUR) so every transaction and closing date has a quote. */
 function priceCurve(asset: string, day: number): number {
   const t = day / 365;
-  const base: Record<string, [number, number]> = { BTC: [38000, 0.9], ETH: [2100, 0.5], BNB: [280, 0.6], SOL: [90, 1.2], USDT: [0.92, 0.0], DOGE: [0.08, 0.5], TRX: [0.1, 0.3] };
+  // Fiat rates are flat by design: they exist so a file kept in francs or
+  // dollars can be valued at all, not to model a currency market.
+  const base: Record<string, [number, number]> = { BTC: [38000, 0.9], ETH: [2100, 0.5], BNB: [280, 0.6], SOL: [90, 1.2], USDT: [0.92, 0.0], DOGE: [0.08, 0.5], TRX: [0.1, 0.3], USD: [0.92, 0.0], CHF: [1.05, 0.0], AED: [0.2505, 0.0] };
   const [p0, amp] = base[asset] ?? [1, 0];
   return p0 * (1 + amp * (0.5 * Math.sin(t * 2.1) + 0.4 * t) ) * (1 + 0.03 * Math.sin(day / 3));
 }
@@ -59,14 +62,38 @@ async function main() {
   const existing = await db.select().from(entities).where(eq(entities.createdBy, user.id));
   if (existing.length) { console.log("Demo data already present"); return; }
 
-  const [company] = await db.insert(entities).values({ name: "Nova Digital SAS", kind: "COMPANY", siren: "912345678", legalForm: "SAS", createdBy: user.id }).returning();
-  const [person] = await db.insert(entities).values({ name: "Amine D. (particulier)", kind: "INDIVIDUAL", createdBy: user.id }).returning();
-  await db.insert(entityMembers).values([{ entityId: company.id, userId: user.id, role: "OWNER" }, { entityId: person.id, userId: user.id, role: "OWNER" }]);
+  // A practice, so the cockpit has something to show.
+  const [firm] = await db.insert(firms).values({ name: "Cabinet Démo & Associés", country: "FR", createdBy: user.id }).returning();
+  await db.insert(firmMembers).values({ firmId: firm.id, userId: user.id, role: "OWNER" });
+
+  /** Creates a file governed by a country pack, so every default comes from it. */
+  const makeEntity = async (input: { name: string; kind: "COMPANY" | "INDIVIDUAL"; country: string; siren?: string; taxId?: string; legalForm?: string; clientRef: string }) => {
+    const pack = getPack(input.country);
+    const [row] = await db.insert(entities).values({
+      name: input.name, kind: input.kind, country: pack.code, timezone: pack.timezone, locale: pack.locale,
+      baseCurrency: pack.baseCurrency, siren: input.siren ?? null, taxId: input.taxId ?? null, legalForm: input.legalForm ?? null,
+      fiscalYearEndMonth: pack.fiscalYear.endMonth, fiscalYearEndDay: pack.fiscalYear.endDay,
+      firmId: firm.id, clientRef: input.clientRef, createdBy: user.id,
+    }).returning();
+    await db.insert(entityMembers).values({ entityId: row.id, userId: user.id, role: "OWNER" });
+    await ensureFiscalYears(row, new Date(Date.UTC(2024, 0, 1)));
+    return row;
+  };
+
+  const company = await makeEntity({ name: "Nova Digital SAS", kind: "COMPANY", country: "FR", siren: "912345678", legalForm: "SAS", clientRef: "FR-001" });
+  const person = await makeEntity({ name: "Amine D. (particulier)", kind: "INDIVIDUAL", country: "FR", clientRef: "FR-002" });
+  // Four more jurisdictions, each exercising a different mechanism: the German
+  // one-year exemption, the Portuguese 365-day rule and swap roll-over, the
+  // Swiss wealth tax and the Dutch deemed return.
+  const berlin = await makeEntity({ name: "Helios Krypto GmbH", kind: "COMPANY", country: "DE", taxId: "DE811234567", legalForm: "GmbH", clientRef: "DE-001" });
+  const lisbon = await makeEntity({ name: "Sofia M. (Portugal)", kind: "INDIVIDUAL", country: "PT", clientRef: "PT-001" });
+  const zug = await makeEntity({ name: "Lukas B. (Suisse)", kind: "INDIVIDUAL", country: "CH", clientRef: "CH-001" });
+  const utrecht = await makeEntity({ name: "Femke V. (Pays-Bas)", kind: "INDIVIDUAL", country: "NL", clientRef: "NL-001" });
+  const all = [company, person, berlin, lisbon, zug, utrecht];
   await db.update(users).set({ lastEntityId: company.id }).where(eq(users.id, user.id));
-  for (const e of [company, person]) await ensureFiscalYears(e, new Date(Date.UTC(2024, 0, 1)));
 
   const csv = demoCsv();
-  for (const e of [company, person]) {
+  for (const e of all) {
     const [acc] = await db.insert(exchangeAccounts).values({ entityId: e.id, exchange: "BINANCE", label: "Binance principal", index: 1, journalCode: "CR1", externalUserId: "41879234" }).returning();
     await db.insert(walletAddresses).values([{ entityId: e.id, address: "0x9a1c3f0b2e4d5a6b7c8d9e0f1a2b3c4d5e6f7a8b", network: "ETH", label: "Ledger", kind: "SELF" }, { entityId: e.id, address: "bc1qdemo7x8k2m3n4p5q6r7s8t9u0v1w2x3y4z5a6b", network: "BTC", label: "Ledger", kind: "SELF" }]);
     const res = importBinanceCsv(csv, acc.id, new Set(["0x9a1c3f0b2e4d5a6b7c8d9e0f1a2b3c4d5e6f7a8b", "bc1qdemo7x8k2m3n4p5q6r7s8t9u0v1w2x3y4z5a6b"]));
@@ -79,7 +106,7 @@ async function main() {
   }
 
   // synthetic price cache: daily quotes 2024-01-01 → today for every asset used
-  const assets = ["BTC", "ETH", "BNB", "SOL", "USDT", "DOGE", "TRX"];
+  const assets = ["BTC", "ETH", "BNB", "SOL", "USDT", "DOGE", "TRX", "USD", "CHF", "AED"];
   const start = Date.UTC(2023, 11, 25);
   const rows: (typeof prices.$inferInsert)[] = [];
   const cov: (typeof priceCoverage.$inferInsert)[] = [];
@@ -91,7 +118,36 @@ async function main() {
   }
   for (let i = 0; i < rows.length; i += 500) await db.insert(prices).values(rows.slice(i, i + 500)).onConflictDoNothing();
   for (let i = 0; i < cov.length; i += 500) await db.insert(priceCoverage).values(cov.slice(i, i + 500)).onConflictDoNothing();
-  console.log(`Seeded demo user ${email}, company ${company.id}, individual ${person.id}, ${rows.length} prices`);
+  // A DAC8 statement for the French individual, drawn up gross so the
+  // reconciliation has something real to explain.
+  await db.insert(dac8Statements).values({
+    entityId: person.id, year: 2025, caspName: "Binance France", caspCountry: "FR",
+    caspIdentifier: "E2023-045", source: "MANUAL", currency: "EUR",
+    aggregates: [
+      { asset: "BTC", type: "CryptoFiatIn", count: 1, units: "0.020000", amount: "2000.00", currency: "EUR" },
+      { asset: "BTC", type: "CryptoFiatOut", count: 1, units: "0.100000", amount: "7800.00", currency: "EUR" },
+      { asset: "BTC", type: "CryptoTransferOut", count: 1, units: "0.020000", amount: "1560.00", currency: "EUR" },
+      { asset: "BTC", type: "TransferWallet", count: null, units: "0.020000", amount: "1560.00", currency: "EUR" },
+    ],
+    holdings: [],
+    notes: "Relevé de démonstration, établi en montants bruts.",
+    createdBy: user.id,
+  });
+
+  // Workflow states, so the cockpit shows a real queue rather than a blank one.
+  const states: [string, "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE"][] = [
+    [company.id, "IN_PROGRESS"], [person.id, "REVIEW"], [berlin.id, "TODO"],
+    [lisbon.id, "IN_PROGRESS"], [zug.id, "DONE"], [utrecht.id, "TODO"],
+  ];
+  for (const [entityId, workflow] of states) {
+    const fys = await db.select().from(fiscalYears).where(eq(fiscalYears.entityId, entityId));
+    // The cockpit shows the most recent year that is not closed, so that is
+    // the one whose state the demo sets.
+    const target = fys.sort((a, b) => b.endDate.getTime() - a.endDate.getTime())[0];
+    if (target) await db.update(fiscalYears).set({ workflow, dueDate: new Date(Date.UTC(2026, 4, 20)) }).where(eq(fiscalYears.id, target.id));
+  }
+
+  console.log(`Seeded demo user ${email}, ${all.length} files across ${new Set(all.map((e) => e.country)).size} countries, ${rows.length} prices`);
 }
 
 main().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });

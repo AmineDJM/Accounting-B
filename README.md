@@ -1,29 +1,51 @@
-# Chainbook — comptabilité crypto au format FEC
+# Chainbook — comptabilité et fiscalité crypto, douze juridictions
 
-Application web multi-dossiers qui transforme l'historique d'un compte d'échange (Binance par API ou par export CSV) en :
+Application web multi-dossiers, destinée aux cabinets d'expertise comptable et à leurs clients. Elle transforme l'historique de comptes d'échange et de portefeuilles en écritures comptables, en déclarations fiscales et en un rapprochement DAC8, sous les règles du pays qui gouverne le dossier.
 
-- un **journal comptable conforme au PCG 2025** (règlement ANC 2018-07 consolidé : comptes 522, 7674/6674, 4742/4752, provision pour pertes latentes), équilibré, numéroté sans rupture, avec écritures d'inventaire et contre-passation ;
-- un **FEC** (art. A47 A-1 du LPF) nommé `SIRENFECAAAAMMJJ.txt`, séparateur `|`, validé avant téléchargement (balance, séquence, dates, formats) ;
-- pour les particuliers, le **calcul des plus-values de l'article 150 VH bis** du CGI (prix total d'acquisition, fractions de capital initial, seuil de 305 €, PFU 30 %) et les lignes du **formulaire 2086**, plus la liste des comptes pour le **3916-bis** ;
-- un tableau de bord (valeur du portefeuille, positions, flux), une revue des opérations à qualifier, des exports CSV (écritures, balance, transactions, plan de comptes).
+**🇫🇷 France · 🇧🇪 Belgique · 🇩🇪 Allemagne · 🇦🇹 Autriche · 🇳🇱 Pays-Bas · 🇪🇸 Espagne · 🇮🇹 Italie · 🇵🇹 Portugal · 🇨🇭 Suisse · 🇦🇪 Émirats arabes unis · 🇶🇦 Qatar · 🇴🇲 Oman**
 
-Ce dépôt est la réécriture, en application web, du notebook *« Gestion comptable et financière sur Binance : comment créer un journal comptable des opérations réalisées au format FEC ? »*. Les trois documents demandés sont dans `docs/` :
+Ce qu'elle produit :
+
+- un **journal comptable** selon le plan de comptes du pays (PCG français et ses comptes 522/7674/6674/4742/4752, SKR 04, EKR autrichien, PGC espagnol, SNC portugais, PCMN belge, RGS néerlandais, KMU suisse, IFRS pour le Golfe), équilibré, numéroté sans rupture ;
+- le **fichier d'audit** que ce pays attend : FEC français, lot d'écritures DATEV, SAF-T (PT) 1.04_01, XAF 3.2, ou journal générique ;
+- le **calcul de l'impôt personnel** sous les règles réelles de chaque juridiction, avec les cases des formulaires locaux ;
+- le **rapprochement DAC8**, qui compare le relevé du prestataire aux agrégats recalculés et explique chaque écart ;
+- l'**explicabilité** : chaque montant se déplie jusqu'à l'opération et à l'article dont il découle, et ce détail est conservé avec le calcul.
+
+Ce dépôt est né de la réécriture, en application web, du notebook *« Gestion comptable et financière sur Binance : comment créer un journal comptable des opérations réalisées au format FEC ? »*. Les documents d'analyse sont dans `docs/` :
 
 | Document | Contenu |
 | --- | --- |
+| [`docs/ANNEXE_MULTIPAYS.md`](docs/ANNEXE_MULTIPAYS.md) | Ce que chaque juridiction impose, article par article : tableau de divergence, pièges par pays, DAC8, fichiers d'audit |
 | [`docs/CE_QUI_MANQUE.md`](docs/CE_QUI_MANQUE.md) | Ce que le notebook ne couvrait pas, ce que l'application corrige, ce qui reste à faire |
-| [`docs/AUDIT_REGLEMENTAIRE.md`](docs/AUDIT_REGLEMENTAIRE.md) | Audit réglementaire : PCG/ANC, FEC, fiscalité des particuliers et des sociétés, MiCA/PSAN, DAC8, RGPD, monopole de l'expertise comptable, sécurité |
+| [`docs/AUDIT_REGLEMENTAIRE.md`](docs/AUDIT_REGLEMENTAIRE.md) | Audit réglementaire français : PCG/ANC, FEC, fiscalité, MiCA/PSAN, DAC8, RGPD, monopole de l'expertise comptable |
 | [`docs/STRATEGIE_CONCURRENTIELLE.md`](docs/STRATEGIE_CONCURRENTIELLE.md) | Positionnement face à Waltio, Koinly, Cryptio, ComptaCrypto, Blockpit… et feuille de route |
+
+## Les trois moteurs
+
+Un pays est un fichier de données, pas un moteur. Les douze jeux de règles alimentent trois calculateurs :
+
+| Moteur | Ce qu'il calcule | Pays |
+| --- | --- | --- |
+| Gains lot par lot | Méthode de coût, exonérations de durée, report de coût sur échanges non imposés, franchises, report des pertes | DE, AT, ES, IT, PT, BE, AE, OM, QA |
+| Assiette portefeuille | La formule de l'article 150 VH bis, qui rapporte la cession à la valeur globale du portefeuille | FR |
+| Patrimoine à une date | Position détenue à la date de référence, rendement forfaitaire ou impôt cantonal sur la fortune | NL, CH |
+
+Les douze packs portent le statut **DRAFT** : ils sont écrits à partir des textes cités, pas validés par un professionnel local, et l'interface l'affiche sur chaque calcul avec la liste des hypothèses retenues.
 
 ## Aperçu
 
-| Tableau de bord | Journal & FEC |
+| Portefeuille clients | Choix du pays |
+| --- | --- |
+| ![Portefeuille clients](docs/screenshots/11-clients.png) | ![Choix du pays](docs/screenshots/12-country-picker.png) |
+
+| Rapprochement DAC8 | Fiscalité et explicabilité |
+| --- | --- |
+| ![Rapprochement DAC8](docs/screenshots/08-dac8.png) | ![Fiscalité](docs/screenshots/07-tax.png) |
+
+| Tableau de bord | Journal comptable |
 | --- | --- |
 | ![Tableau de bord](docs/screenshots/03-dashboard.png) | ![Journal](docs/screenshots/06-journal.png) |
-
-| Transactions | Plus-values des particuliers |
-| --- | --- |
-| ![Transactions](docs/screenshots/05-transactions.png) | ![Fiscalité](docs/screenshots/11-tax.png) |
 
 Le fichier [`docs/demo-FEC-2025.txt`](docs/demo-FEC-2025.txt) est le FEC produit sur les données de démonstration (exercice 2025 de la société fictive « Nova Digital SAS », SIREN fictif).
 
@@ -34,20 +56,31 @@ Next.js 16 (App Router, Server Actions, Turbopack) · React 19 · TypeScript str
 ```
 src/lib/engine/        moteur comptable pur (aucune dépendance à la base ni au réseau)
   model.ts             modèle canonique : une opération = jambes IN / OUT / FEE
-  valuation.ts         table de cours et valorisation en euros (référence : EUR > fiat > stablecoin > BTC/ETH/BNB)
-  costbasis.ts         coût moyen pondéré (CUMP) et PEPS (FIFO) — art. 619-15 PCG
-  chart.ts             plan de comptes par défaut et attribution des sous-comptes 522xxx
-  journal.ts           génération des écritures (opérations, inventaire, extournes, appariement des transferts internes)
+  valuation.ts         table de cours et valorisation (référence : EUR > fiat > stablecoin > BTC/ETH/BNB)
+  fx.ts                rebasage de la table de cours vers CHF, AED, QAR, OMR… et parités officielles du Golfe
+  trace.ts             arbre d'explication : étape, formule, entrées, sortie, référence légale
+  costbasis.ts         coût moyen pondéré et PEPS
+  chart.ts             structure d'un plan de comptes et attribution des sous-comptes par jeton
+  journal.ts           génération des écritures (opérations, inventaire, extournes, transferts internes)
   fec.ts / fecbuild.ts écriture, validation et relecture d'un FEC
-  individual.ts        régime des particuliers (art. 150 VH bis, formulaire 2086)
-  portfolio.ts         positions, valorisation, courbe de valeur
-src/lib/connectors/binance/  client REST signé, synchronisation complète, normalisation, import CSV
+  tz.ts                calendrier comptable : une opération de 23 h 30 UTC le 31 décembre s'impute au 1er janvier
+  tax/lots.ts          registre de lots : FIFO, LIFO, HIFO, prix moyen, suivi par portefeuille, grandfathering
+  tax/gains.ts         moteur de gains piloté par les règles du pack
+  tax/wealth.ts        moteur patrimonial (Pays-Bas, Suisse)
+  tax/fr.ts            formule de l'article 150 VH bis
+src/lib/countries/     douze packs : règles, plans de comptes, formulaires, références légales, hypothèses
+src/lib/dac8/          agrégats CARF, lecture des relevés CSV et XML, rapprochement expliqué
+src/lib/exports/       FEC, DATEV EXTF, SAF-T (PT), XAF (NL), journal générique
+src/lib/connectors/    Binance (API signée et CSV) et lecteurs Coinbase, Kraken, Bitvavo, Bitpanda,
+                       Crypto.com, Bitstamp, Ledger Live, plus un modèle générique, avec détection automatique
 src/lib/pricing/       fournisseurs de cours (klines Binance, taux BCE, CoinGecko en secours) et cache
-src/lib/db/            schéma Drizzle (multi-dossiers, comptes chiffrés, transactions, cours, exercices, journaux, jobs, audit)
+src/lib/db/            schéma Drizzle (cabinets, dossiers, comptes chiffrés, transactions, cours, exercices,
+                       journaux, relevés DAC8, calculs fiscaux, jobs, audit)
 src/lib/dal/           accès aux données avec contrôle des droits par dossier
-src/lib/services/      synchronisation, import, génération du journal, fiscalité, tableau de bord
-src/app/               pages (landing, connexion, onboarding, tableau de bord, comptes, transactions, journal, fiscalité, exports, paramètres)
-tests/                 tests unitaires du moteur, de l'import CSV, du client API et du chiffrement
+src/lib/services/      contexte pays, synchronisation, import, journal, fiscalité, DAC8, fichiers d'audit, cockpit
+src/lib/i18n.ts        chaînes d'interface FR/EN (le vocabulaire juridique reste dans les packs, en langue locale)
+src/app/               pages, dont le portefeuille clients et le rapprochement DAC8
+tests/                 moteurs, packs pays, lecteurs CSV, DAC8, fichiers d'audit, chiffrement
 ```
 
 ## Démarrer en local

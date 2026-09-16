@@ -59,3 +59,30 @@ Authentification Google, base de données, jobs de synchronisation avec progress
 8. **Fiscalité des sociétés** : liasse 2065/2033 (retraitements : la provision pour perte latente sur jetons n'est pas déductible ? à confirmer avec l'expert-comptable), TVA sur prestations payées en crypto.
 9. **Particuliers avancés** : option barème, revenus de staking en BNC (micro-BNC), NFT, prêts/emprunts, DeFi (LP, wrapped tokens), déclaration 2086 pré-remplie au format DGFiP.
 10. **Observabilité** : Sentry, métriques, sauvegardes chiffrées, tests de bout en bout Playwright, tests de charge sur des comptes à 100 000 opérations (la génération est en O(n) mais la valorisation télécharge 96 bougies par jour d'activité et par actif).
+
+---
+
+## Mise à jour du 16 septembre 2026 — ce que la version multipays ajoute et ce qui reste ouvert
+
+### Ce qui est fait depuis la première version
+
+| Manque identifié | État |
+| --- | --- |
+| Un seul pays | **Douze juridictions**, chacune avec ses règles, son plan de comptes, ses formulaires et ses références article par article |
+| Un seul fichier d'audit (FEC) | **DATEV EXTF, SAF-T (PT), XAF (NL) et journal générique** en plus du FEC, choisis par le pays du dossier |
+| Une seule plateforme (Binance) | **Neuf lecteurs** : Binance, Coinbase, Kraken, Bitvavo, Bitpanda, Crypto.com, Bitstamp, Ledger Live, plus un modèle générique, avec détection automatique du format |
+| Rien sur DAC8 | **Rapprochement complet** : lecture du XML CARF et des tableurs, recalcul des huit agrégats, écart chiffré et expliqué ligne par ligne |
+| Aucune traçabilité du calcul | **Arbre d'explication** conservé avec chaque résultat, dépliable jusqu'à l'opération et à l'article |
+| Pas de vue cabinet | **Portefeuille clients** avec l'exercice ouvert, l'état d'avancement, ce qui reste à qualifier et l'échéance |
+| Livres en euros uniquement | **Devise du dossier** (CHF, AED, QAR, OMR…), obtenue en rebasant le cache de cours en euros, sans re-télécharger l'historique |
+
+### Ce qui reste ouvert
+
+1. **La relecture par un professionnel local, pays par pays.** C'est le seul point qui bloque une mise en production commerciale. Tant qu'un pack est en DRAFT, l'application le dit sur chaque écran qui produit un chiffre.
+2. **Les NFT.** Exclus du régime portugais (art. 10.º n.º 21), relevant du § 31 autrichien, non traités ici. Ils apparaissent comme opérations à qualifier.
+3. **La DeFi.** Fourniture de liquidité, emprunts collatéralisés, jetons de staking liquide : la qualification dépend de textes qui n'existent pour ainsi dire nulle part. Les échanges vers un jeton emballé ou un dérivé de staking sont signalés, pas tranchés.
+4. **Le rattachement d'un crypto-actif à la catégorie « valeur mobilière »**, qui décide de l'exonération portugaise de 365 jours et du régime espagnol.
+5. **La liste des cours de l'AFC suisse** (ictax.admin.ch) n'est pas encore consultée : l'application valorise au dernier cours connu, alors que la valeur fiscale publiée prime quand elle existe.
+6. **La certification du logiciel au Portugal** : le SAF-T produit porte un numéro de certificat de remplacement tant que l'Autoridade Tributária n'a pas certifié l'application.
+7. **Le règlement d'exécution omanais**, attendu avant le 29 juin 2026, qui dira si un gain sur crypto-actifs entre dans la base de l'impôt qui démarre le 1er janvier 2028.
+8. **Les tests contre des fichiers réels** : un import à blanc du DATEV dans la version du cabinet destinataire, une validation SAF-T contre le XSD officiel, et un FEC réel dans « Test Compta Demat ».

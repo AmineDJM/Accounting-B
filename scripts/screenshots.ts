@@ -24,12 +24,21 @@ async function main() {
   await page.waitForLoadState("networkidle");
   const entityId = page.url().match(/\/app\/([^/]+)\//)?.[1];
   if (!entityId) throw new Error(`no entity in url ${page.url()}`);
-  const shots: [string, string][] = [["dashboard", "03-dashboard"], ["accounts", "04-accounts"], ["transactions", "05-transactions"], ["journal", "06-journal"], ["exports", "07-exports"], ["settings", "08-settings"]];
+  const shots: [string, string][] = [["dashboard", "03-dashboard"], ["accounts", "04-accounts"], ["transactions", "05-transactions"], ["journal", "06-journal"], ["tax", "07-tax"], ["dac8", "08-dac8"], ["exports", "09-exports"], ["settings", "10-settings"]];
   for (const [path, name] of shots) {
     await page.goto(`${BASE}/app/${entityId}/${path}`); await page.waitForLoadState("networkidle"); await page.waitForTimeout(500);
-    await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: path === "journal" || path === "dashboard" });
+    await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: path === "journal" || path === "dashboard" || path === "dac8" });
     console.log("captured", name);
   }
+  // The practice cockpit and the country picker are not entity pages.
+  await page.goto(`${BASE}/app/clients`); await page.waitForLoadState("networkidle"); await page.waitForTimeout(400);
+  await page.screenshot({ path: `${OUT}/11-clients.png`, fullPage: true });
+  await page.goto(`${BASE}/app/new`); await page.waitForLoadState("networkidle");
+  await page.click('button:has-text("Particulier")');
+  await page.click('button:has-text("Continuer")');
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${OUT}/12-country-picker.png`, fullPage: true });
+  console.log("captured clients + country picker");
   await browser.close();
 }
 main().catch((e) => { console.error(e); process.exit(1); });

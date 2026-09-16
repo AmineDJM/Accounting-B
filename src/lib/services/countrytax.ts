@@ -7,7 +7,7 @@ import { pick } from "@/lib/countries/types";
 import type { TaxComputationResult, YearSummary } from "@/lib/engine/tax/types";
 import { D } from "@/lib/engine/money";
 import { prepareValuation } from "./journal";
-import { contextFor, DRAFT_NOTICE } from "./country";
+import { contextFor, currencyIsPriced, DRAFT_NOTICE } from "./country";
 
 export type StoredTaxRun = typeof taxRuns.$inferSelect;
 
@@ -32,6 +32,12 @@ export async function computeCountryTax(
   const externalHoldings = settings.externalHoldings
     ? Object.fromEntries(Object.entries(settings.externalHoldings).map(([k, v]) => [k, D(v)]))
     : undefined;
+
+  if (!currencyIsPriced(table, ctx, new Date())) {
+    throw new Error(
+      `Aucun taux de change n'est disponible pour convertir les cours en ${ctx.currency}. Le calcul produirait des montants nuls : importez les taux de référence de la BCE, ou tenez ce dossier en euros.`,
+    );
+  }
 
   const result = ctx.pack.engine(
     {

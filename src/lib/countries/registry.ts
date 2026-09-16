@@ -69,22 +69,62 @@ export function countryChoices(): CountryChoice[] {
 function summarise(p: CountryPack): LocalizedText {
   if (p.individual.kind === "WEALTH") {
     const d = p.individual.referenceDate;
+    const day = `${String(d.day).padStart(2, "0")}/${String(d.month).padStart(2, "0")}`;
     return {
-      fr: `Imposition du patrimoine au ${String(d.day).padStart(2, "0")}/${String(d.month).padStart(2, "0")} ; plus-values privées exonérées`,
-      en: `Wealth taxed at ${String(d.day).padStart(2, "0")}/${String(d.month).padStart(2, "0")}; private capital gains exempt`,
+      fr: `Imposition du patrimoine au ${day} ; plus-values privées exonérées`,
+      en: `Wealth taxed at ${day}; private capital gains exempt`,
     };
   }
   const rules = p.individual;
   if (rules.noPersonalTax) return { fr: "Aucun impôt sur le revenu des personnes physiques", en: "No personal income tax" };
-  const years = Object.keys(rules.years).map(Number).sort((a, b) => b - a);
-  const latest = rules.years[years[0]];
-  const rate = latest?.flatRate ? `${(Number(latest.flatRate) * 100).toFixed(latest.flatRate.length > 4 ? 1 : 0).replace(".", ",")} %` : null;
-  const method = rules.costMethod === "AVERAGE" ? "prix moyen" : rules.costMethod;
-  const exempt = rules.exemptAfterDays ? ` ; exonération après ${rules.exemptAfterDays} jours` : rules.exemptAfterYears ? ` ; exonération après ${rules.exemptAfterYears} an${rules.exemptAfterYears > 1 ? "s" : ""}` : "";
+
+  const latest = rules.years[Math.max(...Object.keys(rules.years).map(Number))];
+  const rate = headlineRate(latest);
+  // France prices a disposal against the whole portfolio rather than against
+  // lots, so naming a cost method there would describe a mechanism it does not
+  // use.
+  const method = rules.variant === "FR_PORTFOLIO"
+    ? { fr: "assiette portefeuille", en: "portfolio basis" }
+    : rules.costMethod === "AVERAGE"
+      ? { fr: "prix moyen", en: "average cost" }
+      : { fr: rules.costMethod, en: rules.costMethod };
+  const exemptFr = rules.exemptAfterDays
+    ? ` ; exonération après ${rules.exemptAfterDays} jours`
+    : rules.exemptAfterYears
+      ? ` ; exonération après ${rules.exemptAfterYears} an${rules.exemptAfterYears > 1 ? "s" : ""}`
+      : "";
+  const exemptEn = rules.exemptAfterDays
+    ? `; exempt after ${rules.exemptAfterDays} days`
+    : rules.exemptAfterYears
+      ? `; exempt after ${rules.exemptAfterYears} year${rules.exemptAfterYears > 1 ? "s" : ""}`
+      : "";
   return {
-    fr: `${rate ? `Taux forfaitaire de ${rate}` : "Barème progressif"} ; ${method}${exempt}`,
-    en: `${rate ? `Flat rate of ${rate}` : "Progressive scale"}; ${rules.costMethod}${rules.exemptAfterDays ? `; exempt after ${rules.exemptAfterDays} days` : rules.exemptAfterYears ? `; exempt after ${rules.exemptAfterYears} year(s)` : ""}`,
+    fr: `${rate ? `Taux forfaitaire de ${formatRate(rate, "fr")}` : "Barème progressif"} ; ${method.fr}${exemptFr}`,
+    en: `${rate ? `Flat rate of ${formatRate(rate, "en")}` : "Progressive scale"}; ${method.en}${exemptEn}`,
   };
+}
+
+/**
+ * The rate a taxpayer would quote.
+ *
+ * A country may state it once (Portugal's 28 %) or split it into components
+ * that add up to it (France's 12,8 % of income tax plus 17,2 % of social
+ * levies, which everyone calls 30 %). Reading only `flatRate` would describe
+ * France as progressive, which is the opposite of its default regime.
+ */
+function headlineRate(params: { flatRate?: string; components?: { rate: string }[] } | undefined): number | null {
+  if (!params) return null;
+  if (params.flatRate) return Number(params.flatRate);
+  if (params.components?.length) return params.components.reduce((a, c) => a + Number(c.rate), 0);
+  return null;
+}
+
+function formatRate(rate: number, locale: "fr" | "en"): string {
+  // 0.28 × 100 is 28.000000000000004 in binary floating point, so the rate is
+  // rounded before it is shown. Every rate that is actually computed goes
+  // through Decimal; this one is only a label.
+  const text = (Math.round(rate * 10000) / 100).toString();
+  return locale === "fr" ? `${text.replace(".", ",")} %` : `${text}%`;
 }
 
 /**

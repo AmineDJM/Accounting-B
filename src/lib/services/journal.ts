@@ -28,7 +28,16 @@ export function chartFor(entity: Entity): ChartOfAccounts {
 export async function prepareValuation(entityId: string, entity: Entity, closingDates: Date[], log: (m: string) => void, progress?: (p: number, m: string) => Promise<void>) {
   const db = await getDb();
   const txs = await loadAllTransactions(entityId);
-  const assets = [...new Set(txs.flatMap((t) => t.legs.map((l) => l.asset.toUpperCase())))];
+  const ctx = contextFor(entity);
+  // The books' own currency and the dollar have to be priced even when no
+  // transaction mentions them: the first rebases every quote, the second
+  // converts the CARF threshold. Leaving them out is how a whole portfolio
+  // ends up valued at zero.
+  const assets = [...new Set([
+    ...txs.flatMap((t) => t.legs.map((l) => l.asset.toUpperCase())),
+    ctx.currency,
+    "USD",
+  ])].filter((a) => a !== "EUR");
   const pricing = new PricingService(db, undefined, log);
   await progress?.(10, `Cours de ${assets.length} actifs…`);
   const needs = pricingNeeds(txs, closingDates, assets);
@@ -39,7 +48,6 @@ export async function prepareValuation(entityId: string, entity: Entity, closing
   const to = new Date(Math.max(...closingDates.map((d) => d.getTime()), Date.now()));
   // Prices are cached in euro; an entity whose books are in another currency
   // reads the same cache through a rebasing view rather than a second fetch.
-  const ctx = contextFor(entity);
   const table = tableFor(await pricing.table(assets, from, to), ctx);
   const valued = valueTransactions(txs, table);
   return { txs, valued, table, assets, missing, ctx };

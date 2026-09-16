@@ -83,6 +83,8 @@ export function wealthEngine(input: TaxComputationInput, pack: CountryPack): Tax
   const snapYears: number[] = [];
   for (let y = (activityYears[0] ?? lastYear); y <= lastYear; y++) snapYears.push(y);
   const wealth: WealthSnapshot[] = [];
+  const pending: number[] = [];
+  const now = input.now ?? new Date();
 
   for (const year of snapYears.filter((y) => !input.years || input.years.includes(y))) {
     // Quantity and price are two separate questions. The quantity is the one
@@ -95,6 +97,14 @@ export function wealthEngine(input: TaxComputationInput, pack: CountryPack): Tax
     const at = zonedMidnight(year, rules.referenceDate.month, rules.referenceDate.day + (atStart ? 0 : 1), tz);
     const priceAt = new Date(zonedMidnight(year, rules.referenceDate.month, rules.referenceDate.day + 1, tz).getTime() - 1);
     const cutoff = atStart ? at : new Date(at.getTime() - 1);
+
+    // A reference date that has not arrived yet has no position and no price.
+    // Producing a zero-valued snapshot for it would read as a declaration of
+    // nothing rather than as a year that is not over.
+    if (priceAt > now) {
+      pending.push(year);
+      continue;
+    }
     const qtyByAsset = new Map<string, Decimal>(externals);
     for (const h of holdingsOverTime) {
       if (h.at >= at) continue;
@@ -143,6 +153,14 @@ export function wealthEngine(input: TaxComputationInput, pack: CountryPack): Tax
       }));
     }
     for (const n of params.notes ?? []) notes.push(pick(n, locale));
+    if (missing.length) {
+      // A position that reads zero because no price could be found is worse
+      // than no figure at all: it looks like an answer.
+      warnings.push({
+        level: "error",
+        message: `Position ${year} incomplète : aucun cours pour ${missing.join(", ")}. La valeur déclarée serait fausse${lines.length === missing.length ? " et nulle" : ""}. Vérifiez la devise du dossier et la couverture des cours avant de déclarer.`,
+      });
+    }
     wealth.push({
       year, at: cutoff, currency: cur, holdings: lines, total: cents(total), missing, notes, formLines,
       trace: step(`w-year-${year}`, `${pick(rules.referenceLabel, locale)} ${year}`, { steps, output: money("Valeur déclarée", total.toString(), cur) }),
@@ -150,6 +168,14 @@ export function wealthEngine(input: TaxComputationInput, pack: CountryPack): Tax
     if (estimated) {
       wealth[wealth.length - 1].formLines.push({ form: "—", box: "estimation", label: "Impôt estimé sur la catégorie", value: cents(estimated).toFixed(2), raw: estimated.toString() });
     }
+  }
+
+  if (pending.length) {
+    const d = `${String(rules.referenceDate.day).padStart(2, "0")}/${String(rules.referenceDate.month).padStart(2, "0")}`;
+    warnings.push({
+      level: "info",
+      message: `Aucune position n'est produite pour ${pending.join(", ")} : la date de référence du ${d} n'est pas encore atteinte.`,
+    });
   }
 
   // --- yearly summaries (income + informational gains) ---------------------

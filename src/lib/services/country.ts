@@ -1,7 +1,7 @@
 import "server-only";
 import { getPack } from "@/lib/countries/registry";
 import type { CountryPack } from "@/lib/countries/types";
-import { rebase } from "@/lib/engine/fx";
+import { rebase, unitInEur } from "@/lib/engine/fx";
 import type { PriceTable } from "@/lib/engine/valuation";
 import type { ChartOfAccounts } from "@/lib/engine/chart";
 import type { Entity } from "@/lib/dal/entities";
@@ -48,6 +48,19 @@ export function contextFor(entity: Entity): EntityContext {
  */
 export function tableFor(table: PriceTable, ctx: EntityContext): PriceTable {
   return ctx.currency === "EUR" ? table : rebase(table, ctx.currency);
+}
+
+/**
+ * True when the books' currency can actually be expressed from the euro cache.
+ *
+ * A rebased table returns nothing for every asset when the currency itself has
+ * no rate, which turns a whole portfolio into zeros rather than into an error.
+ * Callers check this before trusting a figure.
+ */
+export function currencyIsPriced(table: PriceTable, ctx: EntityContext, at: Date): boolean {
+  if (ctx.currency === "EUR") return true;
+  const unit = unitInEur(table, ctx.currency, at);
+  return Boolean(unit && !unit.value.isZero());
 }
 
 /** The sentence shown wherever a figure produced from a draft pack is displayed. */
