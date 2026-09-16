@@ -1,6 +1,12 @@
 import { D, ZERO, Decimal } from "./money";
 
-export type CostMethod = "CUMP" | "FIFO";
+/**
+ * Cost-flow assumptions accepted by the accounting frameworks in scope:
+ * weighted average (CUMP/CMP), first-in first-out (PEPS/FIFO), last-in
+ * first-out (LIFO, admitted by §256 HGB and by OIC 13 for inventories) and
+ * highest-in first-out (HIFO, used by some German advisers on request).
+ */
+export type CostMethod = "CUMP" | "FIFO" | "LIFO" | "HIFO";
 
 export interface Lot {
   qty: Decimal;
@@ -71,7 +77,7 @@ export class CostBasisLedger {
     const unit = totalCostEur.div(qty);
     p.qty = p.qty.plus(qty);
     p.totalCost = p.totalCost.plus(totalCostEur);
-    if (this.method === "FIFO") p.lots.push({ qty, unitCost: unit, acquiredAt: at, txId });
+    if (this.method !== "CUMP") p.lots.push({ qty, unitCost: unit, acquiredAt: at, txId });
   }
 
   dispose(asset: string, qty: Decimal, proceedsEur: Decimal): DisposalResult {
@@ -89,6 +95,7 @@ export class CostBasisLedger {
       p.totalCost = p.qty.isZero() ? ZERO : p.totalCost.minus(res.costBasisEur);
     } else {
       let remaining = disposable;
+      this.sortLots(p.lots);
       while (remaining.gt(0) && p.lots.length > 0) {
         const lot = p.lots[0];
         const take = Decimal.min(lot.qty, remaining);
@@ -103,6 +110,13 @@ export class CostBasisLedger {
     }
     res.gainEur = proceedsEur.minus(res.costBasisEur);
     return res;
+  }
+
+  /** Orders the lots so that index 0 is the next one to be consumed. */
+  private sortLots(lots: Lot[]): void {
+    if (this.method === "LIFO") lots.sort((a, b) => b.acquiredAt.getTime() - a.acquiredAt.getTime());
+    else if (this.method === "HIFO") lots.sort((a, b) => b.unitCost.comparedTo(a.unitCost));
+    else lots.sort((a, b) => a.acquiredAt.getTime() - b.acquiredAt.getTime());
   }
 
   snapshot(): Map<string, AssetPosition> {

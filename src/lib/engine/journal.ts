@@ -83,6 +83,8 @@ export interface JournalOptions {
   method: CostMethod;
   accounts: ExchangeAccountInfo[];
   validationDate?: Date;
+  /** Digits appended to the token prefix per asset; 0 books every asset on one account. */
+  assetAccountWidth?: number;
   /** Positions at the opening of the fiscal year (à-nouveaux). When given, transactions before the fiscal year are ignored. */
   openingPositions?: AssetPosition[];
   /** Provision balances per asset at the previous closing. */
@@ -168,13 +170,14 @@ export function generateJournal(valued: ValuedTx[], opts: JournalOptions): Journ
   const ledger = opts.openingPositions ? CostBasisLedger.fromPositions(opts.method, opts.openingPositions) : new CostBasisLedger(opts.method);
 
   const acc = (a: Account) => ({ account: a.number, accountLabel: a.label });
+  const width = opts.assetAccountWidth ?? 3;
   const tokenAccount = (asset: string) => {
     const a = asset.toUpperCase();
     if (isFiat(a) || FIAT_WRAPPERS[a]) {
-      const num = allocateAssetAccount(assetAccountMap, chart.exchangeForeignFiatPrefix, `FIAT:${a}`);
+      const num = allocateAssetAccount(assetAccountMap, chart.exchangeForeignFiatPrefix, `FIAT:${a}`, width);
       return { account: num, accountLabel: `Devises sur plateforme – ${a}` };
     }
-    const num = allocateAssetAccount(assetAccountMap, chart.tokensPrefix, a);
+    const num = allocateAssetAccount(assetAccountMap, chart.tokensPrefix, a, width);
     return { account: num, accountLabel: `Jetons détenus – ${a}` };
   };
   const exchangeEurAccount = (accountId: string) => {

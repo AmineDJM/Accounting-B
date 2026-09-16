@@ -22,10 +22,49 @@ CREATE TABLE "audit_log" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "dac8_reconciliations" (
+	"id" text PRIMARY KEY NOT NULL,
+	"entity_id" text NOT NULL,
+	"statement_id" text NOT NULL,
+	"year" integer NOT NULL,
+	"status" varchar(12) DEFAULT 'DIFFERENCES' NOT NULL,
+	"summary" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"lines" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"created_by" text,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "dac8_statements" (
+	"id" text PRIMARY KEY NOT NULL,
+	"entity_id" text NOT NULL,
+	"account_id" text,
+	"year" integer NOT NULL,
+	"casp_name" text NOT NULL,
+	"casp_country" varchar(2),
+	"casp_identifier" varchar(64),
+	"source" varchar(8) DEFAULT 'CSV' NOT NULL,
+	"file_name" text,
+	"sha256" varchar(64),
+	"currency" varchar(3) DEFAULT 'EUR' NOT NULL,
+	"aggregates" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"holdings" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"raw" jsonb,
+	"notes" text,
+	"created_by" text,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "entities" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"kind" varchar(16) DEFAULT 'COMPANY' NOT NULL,
+	"country" varchar(2) DEFAULT 'FR' NOT NULL,
+	"timezone" varchar(48) DEFAULT 'Europe/Paris' NOT NULL,
+	"locale" varchar(8) DEFAULT 'fr-FR' NOT NULL,
+	"tax_regime" varchar(32),
+	"firm_id" text,
+	"client_ref" varchar(40),
+	"tax_id" varchar(32),
 	"siren" varchar(9),
 	"legal_form" varchar(32),
 	"fy_end_month" integer DEFAULT 12 NOT NULL,
@@ -66,6 +105,23 @@ CREATE TABLE "exchange_accounts" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "firm_members" (
+	"firm_id" text NOT NULL,
+	"user_id" text NOT NULL,
+	"role" varchar(16) DEFAULT 'STAFF' NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "firm_members_firm_id_user_id_pk" PRIMARY KEY("firm_id","user_id")
+);
+--> statement-breakpoint
+CREATE TABLE "firms" (
+	"id" text PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"country" varchar(2) DEFAULT 'FR' NOT NULL,
+	"registration" varchar(64),
+	"created_by" text,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "fiscal_years" (
 	"id" text PRIMARY KEY NOT NULL,
 	"entity_id" text NOT NULL,
@@ -73,6 +129,10 @@ CREATE TABLE "fiscal_years" (
 	"start_date" timestamp with time zone NOT NULL,
 	"end_date" timestamp with time zone NOT NULL,
 	"status" varchar(8) DEFAULT 'OPEN' NOT NULL,
+	"workflow" varchar(16) DEFAULT 'TODO' NOT NULL,
+	"assignee_id" text,
+	"due_date" timestamp with time zone,
+	"opening_lots" jsonb,
 	"opening_positions" jsonb,
 	"previous_provisions" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"closing_provisions" jsonb DEFAULT '{}'::jsonb NOT NULL,
@@ -181,6 +241,18 @@ CREATE TABLE "sessions" (
 	"expires" timestamp NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "tax_runs" (
+	"id" text PRIMARY KEY NOT NULL,
+	"entity_id" text NOT NULL,
+	"country" varchar(2) NOT NULL,
+	"regime" varchar(32) NOT NULL,
+	"currency" varchar(3) NOT NULL,
+	"result" jsonb NOT NULL,
+	"pack_version" varchar(32),
+	"created_by" text,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "transactions" (
 	"id" text PRIMARY KEY NOT NULL,
 	"entity_id" text NOT NULL,
@@ -233,10 +305,19 @@ CREATE TABLE "wallet_addresses" (
 ALTER TABLE "accounts" ADD CONSTRAINT "accounts_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "dac8_reconciliations" ADD CONSTRAINT "dac8_reconciliations_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "dac8_reconciliations" ADD CONSTRAINT "dac8_reconciliations_statement_id_dac8_statements_id_fk" FOREIGN KEY ("statement_id") REFERENCES "public"."dac8_statements"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "dac8_reconciliations" ADD CONSTRAINT "dac8_reconciliations_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "dac8_statements" ADD CONSTRAINT "dac8_statements_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "dac8_statements" ADD CONSTRAINT "dac8_statements_account_id_exchange_accounts_id_fk" FOREIGN KEY ("account_id") REFERENCES "public"."exchange_accounts"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "dac8_statements" ADD CONSTRAINT "dac8_statements_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entities" ADD CONSTRAINT "entities_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entity_members" ADD CONSTRAINT "entity_members_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entity_members" ADD CONSTRAINT "entity_members_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "exchange_accounts" ADD CONSTRAINT "exchange_accounts_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "firm_members" ADD CONSTRAINT "firm_members_firm_id_firms_id_fk" FOREIGN KEY ("firm_id") REFERENCES "public"."firms"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "firm_members" ADD CONSTRAINT "firm_members_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "firms" ADD CONSTRAINT "firms_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fiscal_years" ADD CONSTRAINT "fiscal_years_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "import_files" ADD CONSTRAINT "import_files_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "import_files" ADD CONSTRAINT "import_files_account_id_exchange_accounts_id_fk" FOREIGN KEY ("account_id") REFERENCES "public"."exchange_accounts"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -252,14 +333,19 @@ ALTER TABLE "journal_runs" ADD CONSTRAINT "journal_runs_entity_id_entities_id_fk
 ALTER TABLE "journal_runs" ADD CONSTRAINT "journal_runs_fiscal_year_id_fiscal_years_id_fk" FOREIGN KEY ("fiscal_year_id") REFERENCES "public"."fiscal_years"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "journal_runs" ADD CONSTRAINT "journal_runs_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "sessions" ADD CONSTRAINT "sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tax_runs" ADD CONSTRAINT "tax_runs_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tax_runs" ADD CONSTRAINT "tax_runs_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "transactions" ADD CONSTRAINT "transactions_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "transactions" ADD CONSTRAINT "transactions_account_id_exchange_accounts_id_fk" FOREIGN KEY ("account_id") REFERENCES "public"."exchange_accounts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "wallet_addresses" ADD CONSTRAINT "wallet_addresses_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "dac8_recon_entity_idx" ON "dac8_reconciliations" USING btree ("entity_id","year");--> statement-breakpoint
+CREATE INDEX "dac8_statements_entity_idx" ON "dac8_statements" USING btree ("entity_id","year");--> statement-breakpoint
 CREATE INDEX "exchange_accounts_entity_idx" ON "exchange_accounts" USING btree ("entity_id");--> statement-breakpoint
 CREATE INDEX "fiscal_years_entity_idx" ON "fiscal_years" USING btree ("entity_id");--> statement-breakpoint
 CREATE INDEX "jobs_entity_idx" ON "jobs" USING btree ("entity_id","created_at");--> statement-breakpoint
 CREATE INDEX "journal_entries_run_idx" ON "journal_entries" USING btree ("run_id","journal_code","seq");--> statement-breakpoint
 CREATE INDEX "prices_asset_ts_idx" ON "prices" USING btree ("asset","ts");--> statement-breakpoint
+CREATE INDEX "tax_runs_entity_idx" ON "tax_runs" USING btree ("entity_id","created_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "transactions_account_external_idx" ON "transactions" USING btree ("account_id","external_id");--> statement-breakpoint
 CREATE INDEX "transactions_entity_ts_idx" ON "transactions" USING btree ("entity_id","timestamp");--> statement-breakpoint
 CREATE INDEX "wallet_addresses_entity_idx" ON "wallet_addresses" USING btree ("entity_id");

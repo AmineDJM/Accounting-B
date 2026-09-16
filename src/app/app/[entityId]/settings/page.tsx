@@ -31,7 +31,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ entit
       <SettingsClient
         entityId={entityId}
         role={role}
-        entity={{ name: entity.name, kind: entity.kind, siren: entity.siren ?? "", legalForm: entity.legalForm ?? "", fiscalYearEndMonth: entity.fiscalYearEndMonth, fiscalYearEndDay: entity.fiscalYearEndDay, costMethod: entity.costMethod }}
+        entity={{ name: entity.name, kind: entity.kind, siren: entity.siren ?? "", legalForm: entity.legalForm ?? "", fiscalYearEndMonth: entity.fiscalYearEndMonth, fiscalYearEndDay: entity.fiscalYearEndDay, costMethod: entity.costMethod as "CUMP" | "FIFO" }}
         chart={chart}
         capitalizeFees={Boolean(overrides.capitalizeFees)}
         assetAccounts={Object.entries(entity.assetAccountMap ?? {}).map(([asset, number]) => ({ asset, number }))}

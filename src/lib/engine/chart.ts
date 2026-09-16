@@ -85,6 +85,10 @@ export type AssetAccountMap = Record<string, string>;
 
 export function allocateAssetAccount(map: AssetAccountMap, prefix: string, asset: string, width = 3): string {
   const key = asset.toUpperCase();
+  // width 0 means the framework books every asset on a single account, with the
+  // asset named in the entry label (Germany and Austria have no standard
+  // per-token account and DATEV cannot carry a crypto unit as a currency).
+  if (width === 0) return prefix;
   if (map[key]) return map[key];
   const used = new Set(Object.values(map));
   for (let i = 1; i < 10 ** width; i++) {
