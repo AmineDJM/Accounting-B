@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireUser, signOut } from "@/auth";
 import { acceptInvitation, createEntity, setLastEntity } from "@/lib/dal/entities";
 import { assertCanWrite, assertCountryAllowed, PlatformError } from "@/lib/dal/platform";
+import { startFullRefresh } from "@/lib/services/refresh";
 import { requireActor } from "@/auth";
 
 const createSchema = z.object({
@@ -71,4 +72,20 @@ export async function acceptInvitationAction(token: string) {
   const entity = await acceptInvitation(user.id, user.email, token);
   revalidatePath("/app");
   redirect(`/app/${entity.id}/dashboard`);
+}
+
+/**
+ * One button for the whole chain: synchronise every connected platform, value
+ * the operations, generate the journal and recompute the tax. It reports into a
+ * single job, so there is one thing to watch.
+ */
+export async function refreshAllAction(entityId: string): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  try {
+    const actor = await requireActor();
+    assertCanWrite(actor);
+    const job = await startFullRefresh(actor.id, entityId);
+    return { ok: true, id: job.id };
+  } catch (e) {
+    return { ok: false, error: e instanceof PlatformError ? e.message : (e as Error).message };
+  }
 }

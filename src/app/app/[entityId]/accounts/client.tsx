@@ -8,9 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown";
-import { Field, Input, Select } from "@/components/ui/input";
+import { Field, Input, Select, Textarea } from "@/components/ui/input";
+import { PLATFORMS, platformSpec } from "@/lib/connectors/platforms";
+import type { ExchangeKind } from "@/lib/db/schema";
 import { Alert, EmptyState } from "@/components/ui/misc";
 import { JobPanel, useJob, type JobState } from "@/components/app/job-progress";
+import { RefreshAll } from "@/components/app/refresh-all";
 import { fmtDate, fmtNum } from "@/lib/utils";
 import { addWalletAction, createAccountAction, deleteAccountAction, purgeAccountTransactionsAction, removeWalletAction, renameAccountAction, startSyncAction, testCredentialsAction, updateKeysAction } from "./actions";
 
@@ -23,14 +26,19 @@ export function AccountsClient({ entityId, entityKind, canEdit, welcome, account
   const job = useJob(entityId, jobId, (j) => { if (j.status === "DONE") toast.success("Traitement terminé"); else toast.error(j.message ?? "Échec"); });
   return (
     <div className="space-y-6">
-      {welcome && accounts.length === 0 ? <Alert tone="info" title="Bienvenue ! Deux façons d'importer vos opérations.">Par clé API (lecture seule, synchronisation automatique) ou par export CSV « Transaction History » (Binance → Portefeuille → Historique des transactions → Exporter). {entityKind === "COMPANY" ? "Importez tout l'historique depuis l'ouverture du compte : le coût d'acquisition en dépend." : "Importez tout l'historique : le prix total d'acquisition de votre portefeuille en dépend."}</Alert> : null}
+      {welcome && accounts.length === 0 ? <Alert tone="info" title="Bienvenue ! Deux façons d'apporter vos opérations.">Une clé API en lecture seule (Binance, Kraken, Coinbase) synchronise tout automatiquement ; sinon déposez un fichier d&apos;export — le format est reconnu tout seul, y compris Bitvavo, Bitpanda, Crypto.com, Bitstamp et Ledger Live. Vous pouvez connecter plusieurs plateformes au même dossier. {entityKind === "COMPANY" ? "Importez tout l'historique depuis l'ouverture du compte : le coût d'acquisition en dépend." : "Importez tout l'historique : le prix total d'acquisition de votre portefeuille en dépend."}</Alert> : null}
       {job ? <JobPanel job={job} /> : null}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Comptes d&apos;échange</h2>
-        {canEdit ? <AddAccountDialog entityId={entityId} /> : null}
+        <h2 className="text-lg font-semibold">Plateformes connectées</h2>
+        {canEdit ? (
+          <div className="flex items-center gap-2">
+            {accounts.some((a) => a.hasApiKey) ? <RefreshAll entityId={entityId} /> : null}
+            <AddAccountDialog entityId={entityId} />
+          </div>
+        ) : null}
       </div>
       {accounts.length === 0 ? (
-        <EmptyState icon={Wallet} title="Aucun compte" description="Ajoutez un compte Binance (clé API en lecture seule) ou un compte « import CSV » pour toute autre plateforme au format Binance." action={canEdit ? <AddAccountDialog entityId={entityId} /> : undefined} />
+        <EmptyState icon={Wallet} title="Aucune plateforme connectée" description="Connectez Binance, Kraken ou Coinbase avec une clé en lecture seule, ou créez un compte « fichier » pour toute autre plateforme. Plusieurs plateformes peuvent cohabiter dans un même dossier." action={canEdit ? <AddAccountDialog entityId={entityId} /> : undefined} />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {accounts.map((a) => <AccountCard key={a.id} account={a} entityId={entityId} canEdit={canEdit} onJob={setJobId} busy={Boolean(job && job.status === "RUNNING")} />)}
@@ -95,7 +103,7 @@ function AccountCard({ account: a, entityId, canEdit, onJob, busy }: { account: 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-semibold">{a.label}</p>
-              <Badge>{a.exchange === "BINANCE" ? "Binance" : "CSV générique"}</Badge>
+              <Badge>{platformSpec(a.exchange).name}</Badge>
               {a.hasApiKey ? <Badge tone="positive"><KeyRound className="h-3 w-3" /> API {a.apiKeyHint}</Badge> : <Badge tone="neutral">Sans clé API</Badge>}
               {a.status === "ERROR" ? <Badge tone="negative">Erreur</Badge> : null}
             </div>
@@ -127,35 +135,102 @@ function AccountCard({ account: a, entityId, canEdit, onJob, busy }: { account: 
   );
 }
 
+/**
+ * Connecting a platform, in one screen.
+ *
+ * The platform is picked first, because everything else depends on it: what the
+ * two secrets are called, how to create a key that can only read, and whether a
+ * key exists at all. The steps come from the platform description rather than
+ * from prose here, so the wizard and the server agree on what is being asked.
+ */
 function AddAccountDialog({ entityId }: { entityId: string }) {
   const [open, setOpen] = useState(false);
-  const [exchange, setExchange] = useState<"BINANCE" | "GENERIC">("BINANCE");
+  const [exchange, setExchange] = useState<ExchangeKind>("BINANCE");
   const [label, setLabel] = useState("Binance");
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
   const [test, setTest] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
+  const spec = platformSpec(exchange);
+
+  const pick = (code: ExchangeKind) => {
+    const next = platformSpec(code);
+    setExchange(code);
+    setLabel(next.name);
+    setApiKey("");
+    setApiSecret("");
+    setTest(null);
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button><Plus className="h-4 w-4" /> Ajouter un compte</Button></DialogTrigger>
-      <DialogContent title="Nouveau compte d'échange" description="La clé API est facultative : sans clé, vous importerez des fichiers CSV.">
-        <form className="grid gap-4" onSubmit={(e) => { e.preventDefault(); start(async () => { const r = await createAccountAction(entityId, { exchange, label, apiKey, apiSecret }); if (r.ok) { toast.success("Compte ajouté"); setOpen(false); router.refresh(); } else toast.error(r.error); }); }}>
-          <Field label="Plateforme"><Select value={exchange} onChange={(e) => { const v = e.target.value as "BINANCE" | "GENERIC"; setExchange(v); setLabel(v === "BINANCE" ? "Binance" : "Autre plateforme"); }}><option value="BINANCE">Binance (API ou CSV)</option><option value="GENERIC">Autre plateforme (CSV au format Binance)</option></Select></Field>
-          <Field label="Libellé" hint="Apparaît dans le libellé du journal et du compte 5171xx"><Input value={label} onChange={(e) => setLabel(e.target.value)} required maxLength={80} /></Field>
-          {exchange === "BINANCE" ? (
+      <DialogTrigger asChild><Button><Plus className="h-4 w-4" /> Connecter une plateforme</Button></DialogTrigger>
+      <DialogContent title="Connecter une plateforme" description="Une clé en lecture seule synchronise tout automatiquement. Sans clé, vous déposerez un fichier d'export.">
+        <form
+          className="grid gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            start(async () => {
+              const r = await createAccountAction(entityId, { exchange, label, apiKey, apiSecret });
+              if (r.ok) { toast.success("Plateforme connectée"); setOpen(false); router.refresh(); } else toast.error(r.error);
+            });
+          }}
+        >
+          <div>
+            <p className="mb-2 text-sm font-medium">Plateforme</p>
+            <div className="grid grid-cols-2 gap-2">
+              {PLATFORMS.map((p) => (
+                <button
+                  key={p.code}
+                  type="button"
+                  onClick={() => pick(p.code)}
+                  className={`rounded-lg border p-3 text-left transition-colors ${exchange === p.code ? "border-primary bg-primary-soft" : "border-border hover:bg-surface-2"}`}
+                >
+                  <span className="block text-sm font-medium">{p.name}</span>
+                  <span className="mt-0.5 block text-[11px] text-fg-muted">{p.api ? "Clé API ou fichier" : "Fichier uniquement"}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Field label="Libellé" hint="Apparaît dans le libellé du journal et du compte de trésorerie"><Input value={label} onChange={(e) => setLabel(e.target.value)} required maxLength={80} /></Field>
+
+          {spec.api ? (
             <>
               <div className="rounded-lg bg-surface-2 p-3 text-xs text-fg-muted">
-                <p className="flex items-center gap-1.5 font-medium text-fg"><ShieldCheck className="h-3.5 w-3.5 text-positive" /> Créez la clé avec « Enable Reading » uniquement</p>
-                <p className="mt-1">Binance → Profil → Gestion des API → Créer une API (System generated). Ne cochez ni trading ni retraits, et restreignez si possible l&apos;accès à l&apos;adresse IP de votre serveur. Les clés sont chiffrées avant stockage.</p>
+                <p className="flex items-center gap-1.5 font-medium text-fg"><ShieldCheck className="h-3.5 w-3.5 text-positive" aria-hidden /> Permissions : {spec.permissions}</p>
+                <ol className="mt-1.5 list-decimal space-y-1 pl-4">
+                  {spec.steps.map((st) => <li key={st}>{st}</li>)}
+                </ol>
+                {spec.docsUrl ? <a className="mt-2 inline-block text-primary hover:underline" href={spec.docsUrl} target="_blank" rel="noreferrer">Ouvrir la page des clés {spec.name} →</a> : null}
+                <p className="mt-2">Les clés sont chiffrées avant stockage ; le navigateur n&apos;en revoit que les quatre derniers caractères.</p>
               </div>
-              <Field label="Clé API (facultatif)"><Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} autoComplete="off" spellCheck={false} /></Field>
-              <Field label="Secret API (facultatif)"><Input type="password" value={apiSecret} onChange={(e) => setApiSecret(e.target.value)} autoComplete="off" /></Field>
-              {apiKey && apiSecret ? <Button type="button" variant="outline" size="sm" onClick={() => start(async () => { const r = await testCredentialsAction(apiKey, apiSecret); setTest(r.ok ? `✅ ${r.message}` : `❌ ${r.error}`); })}>Tester la connexion</Button> : null}
+              <Field label={`${spec.keyLabel} (facultatif)`}>
+                <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={spec.keyPlaceholder} autoComplete="off" spellCheck={false} />
+              </Field>
+              <Field label={`${spec.secretLabel} (facultatif)`}>
+                {spec.secretMultiline ? (
+                  <Textarea value={apiSecret} onChange={(e) => setApiSecret(e.target.value)} placeholder={spec.secretPlaceholder} rows={4} autoComplete="off" spellCheck={false} className="num text-xs" />
+                ) : (
+                  <Input type="password" value={apiSecret} onChange={(e) => setApiSecret(e.target.value)} placeholder={spec.secretPlaceholder} autoComplete="off" />
+                )}
+              </Field>
+              {apiKey && apiSecret ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => start(async () => { const r = await testCredentialsAction(exchange, apiKey, apiSecret); setTest(r.ok ? `✅ ${r.message}` : `❌ ${r.error}`); })}>
+                  Tester la connexion
+                </Button>
+              ) : null}
               {test ? <p className="text-xs">{test}</p> : null}
             </>
           ) : null}
-          <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={() => setOpen(false)}>Annuler</Button><Button type="submit" loading={pending}>Créer</Button></div>
+
+          <div className="rounded-lg border border-dashed border-border-strong p-3 text-xs text-fg-muted">
+            <p className="flex items-center gap-1.5 font-medium text-fg"><FileUp className="h-3.5 w-3.5" aria-hidden /> Sans clé : par fichier</p>
+            <p className="mt-1">{spec.csv}</p>
+          </div>
+
+          <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={() => setOpen(false)}>Annuler</Button><Button type="submit" loading={pending}>Connecter</Button></div>
         </form>
       </DialogContent>
     </Dialog>
@@ -166,13 +241,18 @@ function KeysDialog({ entityId, account }: { entityId: string; account: AccountV
   const [open, setOpen] = useState(false);
   const [apiKey, setApiKey] = useState(""); const [apiSecret, setApiSecret] = useState("");
   const [pending, start] = useTransition();
+  const spec = platformSpec(account.exchange);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setOpen(true); }}><KeyRound className="h-4 w-4" /> {account.hasApiKey ? "Remplacer la clé API" : "Ajouter une clé API"}</DropdownMenuItem>
-      <DialogContent title="Clé API Binance" description="Lecture seule uniquement. La clé est testée avant d'être enregistrée.">
-        <form className="grid gap-4" onSubmit={(e) => { e.preventDefault(); start(async () => { const r = await updateKeysAction(entityId, account.id, apiKey, apiSecret); if (r.ok) { toast.success(r.message ?? "Clé enregistrée"); setOpen(false); } else toast.error(r.error); }); }}>
-          <Field label="Clé API"><Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} required autoComplete="off" /></Field>
-          <Field label="Secret"><Input type="password" value={apiSecret} onChange={(e) => setApiSecret(e.target.value)} required autoComplete="off" /></Field>
+      <DialogContent title={`Clé API ${spec.name}`} description={`Permissions attendues : ${spec.permissions}. La clé est testée avant d'être enregistrée.`}>
+        <form className="grid gap-4" onSubmit={(e) => { e.preventDefault(); start(async () => { const r = await updateKeysAction(entityId, account.id, account.exchange as ExchangeKind, apiKey, apiSecret); if (r.ok) { toast.success(r.message ?? "Clé enregistrée"); setOpen(false); } else toast.error(r.error); }); }}>
+          <Field label={spec.keyLabel || "Clé API"}><Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={spec.keyPlaceholder} required autoComplete="off" spellCheck={false} /></Field>
+          <Field label={spec.secretLabel || "Secret"}>
+            {spec.secretMultiline
+              ? <Textarea value={apiSecret} onChange={(e) => setApiSecret(e.target.value)} placeholder={spec.secretPlaceholder} rows={4} required autoComplete="off" spellCheck={false} className="num text-xs" />
+              : <Input type="password" value={apiSecret} onChange={(e) => setApiSecret(e.target.value)} required autoComplete="off" />}
+          </Field>
           <div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={() => setOpen(false)}>Annuler</Button><Button type="submit" loading={pending}>Enregistrer</Button></div>
         </form>
       </DialogContent>

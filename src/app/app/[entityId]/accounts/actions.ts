@@ -5,14 +5,17 @@ import { requireUser } from "@/auth";
 import { addWallet, createAccount, deleteAccount, removeWallet, updateAccount, updateAccountKeys } from "@/lib/dal/accounts";
 import { categorizeByAddress, deleteAccountTransactions } from "@/lib/dal/transactions";
 import { startAccountSync, testCredentials } from "@/lib/services/sync";
+import { platformSpec } from "@/lib/connectors/platforms";
+import type { ExchangeKind } from "@/lib/db/schema";
 
 export type Result = { ok: true; message?: string; id?: string } | { ok: false; error: string };
 
 const accountSchema = z.object({
-  exchange: z.enum(["BINANCE", "GENERIC"]),
+  exchange: z.enum(["BINANCE", "KRAKEN", "COINBASE", "GENERIC"]),
   label: z.string().trim().min(1).max(80),
   apiKey: z.string().trim().max(200).optional().or(z.literal("")),
-  apiSecret: z.string().trim().max(200).optional().or(z.literal("")),
+  // Coinbase's private key is a PEM block, so the secret is not a one-liner.
+  apiSecret: z.string().trim().max(4000).optional().or(z.literal("")),
 });
 
 export async function createAccountAction(entityId: string, input: z.input<typeof accountSchema>): Promise<Result> {
@@ -21,8 +24,8 @@ export async function createAccountAction(entityId: string, input: z.input<typeo
     const d = accountSchema.parse(input);
     if ((d.apiKey && !d.apiSecret) || (!d.apiKey && d.apiSecret)) return { ok: false, error: "Renseignez la clé ET le secret, ou aucun des deux." };
     if (d.apiKey && d.apiSecret) {
-      const test = await testCredentials(d.apiKey, d.apiSecret);
-      if (!test.ok) return { ok: false, error: `Clé refusée par Binance : ${test.message}` };
+      const test = await testCredentials(d.exchange, d.apiKey, d.apiSecret);
+      if (!test.ok) return { ok: false, error: `Clé refusée par ${platformSpec(d.exchange).name} : ${test.message}` };
     }
     const acc = await createAccount(user.id, entityId, { exchange: d.exchange, label: d.label, apiKey: d.apiKey || undefined, apiSecret: d.apiSecret || undefined });
     revalidatePath(`/app/${entityId}`, "layout");
@@ -32,16 +35,16 @@ export async function createAccountAction(entityId: string, input: z.input<typeo
   }
 }
 
-export async function testCredentialsAction(apiKey: string, apiSecret: string): Promise<Result> {
+export async function testCredentialsAction(exchange: ExchangeKind, apiKey: string, apiSecret: string): Promise<Result> {
   await requireUser();
-  const r = await testCredentials(apiKey.trim(), apiSecret.trim());
+  const r = await testCredentials(exchange, apiKey.trim(), apiSecret.trim());
   return r.ok ? { ok: true, message: r.message } : { ok: false, error: r.message };
 }
 
-export async function updateKeysAction(entityId: string, accountId: string, apiKey: string, apiSecret: string): Promise<Result> {
+export async function updateKeysAction(entityId: string, accountId: string, exchange: ExchangeKind, apiKey: string, apiSecret: string): Promise<Result> {
   try {
     const user = await requireUser();
-    const test = await testCredentials(apiKey.trim(), apiSecret.trim());
+    const test = await testCredentials(exchange, apiKey.trim(), apiSecret.trim());
     if (!test.ok) return { ok: false, error: `Clé refusée : ${test.message}` };
     await updateAccountKeys(user.id, entityId, accountId, apiKey, apiSecret);
     revalidatePath(`/app/${entityId}/accounts`);

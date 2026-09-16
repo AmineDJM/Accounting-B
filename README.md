@@ -57,6 +57,30 @@ Les captures se reproduisent avec `npm run seed`, puis `npm run demo` (qui lance
 
 Le fichier [`docs/demo-FEC-2025.txt`](docs/demo-FEC-2025.txt) est le FEC produit sur les données de démonstration (exercice 2025 de la société fictive « Nova Digital SAS », SIREN fictif).
 
+## Brancher une ou plusieurs plateformes
+
+Un dossier peut porter autant de plateformes qu'il en faut. Trois se connectent par **clé API en lecture seule**, et la synchronisation est ensuite automatique :
+
+| Plateforme | Ce qu'il faut créer | Ce que lit le connecteur |
+| --- | --- | --- |
+| **Binance** | Clé API, *Enable Reading* seulement | Trades spot, Convert, achats carte, dépôts et retraits, fiat, earn, poussières |
+| **Kraken** | Clé avec *Query funds*, *orders & trades*, *ledger entries* | Trades spot (`TradesHistory`) et registre complet (`Ledgers`) : dépôts, retraits, staking, conversions |
+| **Coinbase** | Clé CDP avec la permission *View* | Exécutions Advanced Trade, puis le registre v2 de chaque portefeuille : virements, envois, récompenses, achats simples, conversions |
+
+Pour tout le reste — Bitvavo, Bitpanda, Crypto.com, Bitstamp, Ledger Live, ou n'importe quel export — **déposez le fichier** : le format est reconnu automatiquement.
+
+![Connecter une plateforme](docs/screenshots/18-connect.png)
+
+L'assistant affiche, pour la plateforme choisie, les permissions attendues et les étapes exactes chez elle. La clé est **testée avant d'être enregistrée** — et si elle autorise le trading ou les retraits, l'application le dit plutôt que de l'accepter en silence. Elle est ensuite chiffrée en AES-256-GCM ; le navigateur n'en revoit que les quatre derniers caractères.
+
+### Un seul bouton
+
+**Tout mettre à jour** enchaîne, dans un seul traitement suivi d'une seule barre de progression : synchronisation de chaque plateforme connectée → valorisation → journal de l'exercice → calcul de l'impôt. Une plateforme qui refuse la connexion n'annule pas les autres : son motif part dans le journal du traitement, le reste continue.
+
+Ce que les connecteurs **ne peuvent pas** deviner, et qu'ils signalent plutôt que d'inventer : les trades sur marge et les produits dérivés Kraken, les frais d'un achat simple Coinbase (la plateforme ne les détaille pas sur ce point d'accès), et les frais d'un dépôt on-chain quand le portefeuille émetteur n'est pas suivi.
+
+> Les clients Binance, Kraken et Coinbase sont écrits d'après la documentation officielle de chaque plateforme et testés sur des réponses simulées. La signature Kraken est vérifiée contre l'exemple publié par Kraken ; le jeton Coinbase est vérifié en le validant avec la clé publique correspondante. Le réseau du conteneur de développement ne permet pas d'appeler ces API en direct : la première synchronisation réelle reste à faire.
+
 ## Identité
 
 La marque est un **F construit avec quatre pilules** : une hampe, deux bras de longueur décroissante et un point là où un troisième bras s'arrêterait — le point du « i », emprunté. Les cinq couleurs de la marque n'apparaissent ensemble qu'ici.
@@ -95,15 +119,18 @@ src/lib/engine/        moteur comptable pur (aucune dépendance à la base ni au
 src/lib/countries/     douze packs : règles, plans de comptes, formulaires, références légales, hypothèses
 src/lib/dac8/          agrégats CARF, lecture des relevés CSV et XML, rapprochement expliqué
 src/lib/exports/       FEC, DATEV EXTF, SAF-T (PT), XAF (NL), journal générique
-src/lib/connectors/    Binance (API signée et CSV) et lecteurs Coinbase, Kraken, Bitvavo, Bitpanda,
-                       Crypto.com, Bitstamp, Ledger Live, plus un modèle générique, avec détection automatique
+src/lib/connectors/    API signées Binance, Kraken et Coinbase (client, normalisation, synchronisation),
+                       lecteurs de fichiers Coinbase, Kraken, Bitvavo, Bitpanda, Crypto.com, Bitstamp,
+                       Ledger Live et un modèle générique, avec détection automatique du format
+                       platforms.ts : ce que chaque plateforme demande, lu par l'assistant et par le serveur
 src/lib/pricing/       fournisseurs de cours (klines Binance, taux BCE, CoinGecko en secours) et cache
 src/lib/db/            schéma Drizzle (cabinets, dossiers, comptes chiffrés, transactions, cours, exercices,
                        journaux, relevés DAC8, calculs fiscaux, jobs, audit)
 src/lib/authz.ts       rôles de plateforme, états de compte, droits pays (pur, testable)
 src/lib/dal/           accès aux données avec contrôle des droits par dossier, comptes et consultations
 src/lib/services/      contexte pays, synchronisation, import, journal, fiscalité, DAC8, fichiers d'audit,
-                       cockpit du cabinet, administration de la plateforme (mesures, comptes, audit)
+                       cockpit du cabinet, administration de la plateforme (mesures, comptes, audit),
+                       refresh.ts : la chaîne complète derrière « Tout mettre à jour »
 src/lib/i18n.ts        chaînes d'interface FR/EN (le vocabulaire juridique reste dans les packs, en langue locale)
 src/app/               pages, dont le portefeuille clients, le rapprochement DAC8 et la console /admin
 tests/                 moteurs, packs pays, lecteurs CSV, DAC8, fichiers d'audit, chiffrement, droits de plateforme
@@ -116,7 +143,7 @@ cp .env.example .env.local        # AUTH_SECRET, APP_ENCRYPTION_KEY, AUTH_DEV_LO
 npm install
 npm run seed                      # données de démonstration (utilisateur demo@finly.local)
 npm run dev                       # http://localhost:3000 → « Entrer sans Google »
-npm test                          # 143 tests
+npm test                          # 179 tests
 ```
 
 Sans `DATABASE_URL`, une base PostgreSQL embarquée (PGlite) est créée dans `.data/pglite` et migrée automatiquement.
@@ -201,4 +228,4 @@ Ce qu'un administrateur **ne peut pas** faire : lire une clé d'API d'échange (
 
 ## Limites connues
 
-Voir [`docs/CE_QUI_MANQUE.md`](docs/CE_QUI_MANQUE.md). En résumé : le client API Binance a été écrit à partir de la documentation officielle et testé avec des réponses simulées (Binance bloque le réseau du conteneur de développement) ; les frais des dépôts *on-chain* ne sont connus que si le wallet émetteur est suivi ; l'envoi d'e-mails d'invitation n'est pas branché (le lien est fourni à copier).
+Voir [`docs/CE_QUI_MANQUE.md`](docs/CE_QUI_MANQUE.md). En résumé : les clients API Binance, Kraken et Coinbase ont été écrits à partir de la documentation officielle et testés sur des réponses simulées (le réseau du conteneur de développement ne les atteint pas) ; les frais des dépôts *on-chain* ne sont connus que si le wallet émetteur est suivi ; les frais d'un achat simple Coinbase sont compris dans le montant en devise ; les trades sur marge et les dérivés ne sont pas pris en charge ; l'envoi d'e-mails d'invitation n'est pas branché (le lien est fourni à copier).

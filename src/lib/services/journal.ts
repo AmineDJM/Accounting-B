@@ -13,7 +13,7 @@ import { defaultProviders, pricingNeeds, PricingService } from "@/lib/pricing/se
 import { coingeckoKey } from "@/lib/dal/settings";
 import { listAccounts } from "@/lib/dal/accounts";
 import { requireEntity, type Entity, type FiscalYear } from "@/lib/dal/entities";
-import { createJob, spawn, type Job } from "@/lib/dal/jobs";
+import { createJob, spawn, type Job, type JobContext } from "@/lib/dal/jobs";
 import { loadAllTransactions } from "@/lib/dal/transactions";
 import { entities } from "@/lib/db/schema";
 
@@ -55,13 +55,16 @@ export async function prepareValuation(entityId: string, entity: Entity, closing
 }
 
 /** Runs the accounting engine for a fiscal year and stores the resulting journal. */
-export async function startJournalRun(userId: string, entityId: string, fiscalYearId: string, opts: { withInventory: boolean }): Promise<Job> {
+/**
+ * Generates and stores one journal run, inside a job that already exists, so
+ * that the one-click refresh can chain it after the synchronisations.
+ */
+export async function runJournalGeneration(ctx: JobContext, userId: string, entityId: string, fiscalYearId: string, opts: { withInventory: boolean }): Promise<{ runId: string; entries: number; warnings: number }> {
   const { entity } = await requireEntity(userId, entityId, "ACCOUNTANT");
   const db = await getDb();
   const [fy] = await db.select().from(fiscalYears).where(and(eq(fiscalYears.id, fiscalYearId), eq(fiscalYears.entityId, entityId)));
   if (!fy) throw new Error("Exercice introuvable");
-  const job = await createJob(entityId, "JOURNAL", userId, null, `Génération du journal ${fy.label}`);
-  spawn(job, async (ctx) => {
+  {
     const accounts = await listAccounts(userId, entityId);
     const { valued, table, missing } = await prepareValuation(entityId, entity, [fy.endDate], (m) => void ctx.log(m), (p, m) => ctx.progress(p, m));
     await ctx.progress(60, "Génération des écritures…");
@@ -110,7 +113,17 @@ export async function startJournalRun(userId: string, entityId: string, fiscalYe
     await db.insert(auditLog).values({ entityId, userId, action: "journal.run", details: { runId: run.id, fiscalYear: fy.label, entries: result.totals.entries } });
     await ctx.log(`${result.totals.entries} écritures (${result.totals.lines} lignes), ${result.warnings.length} alerte(s).`);
     return { runId: run.id, entries: result.totals.entries, warnings: result.warnings.length };
-  });
+  }
+}
+
+export async function startJournalRun(userId: string, entityId: string, fiscalYearId: string, opts: { withInventory: boolean }): Promise<Job> {
+  const { entity } = await requireEntity(userId, entityId, "ACCOUNTANT");
+  void entity;
+  const db = await getDb();
+  const [fy] = await db.select().from(fiscalYears).where(and(eq(fiscalYears.id, fiscalYearId), eq(fiscalYears.entityId, entityId)));
+  if (!fy) throw new Error("Exercice introuvable");
+  const job = await createJob(entityId, "JOURNAL", userId, null, `Génération du journal ${fy.label}`);
+  spawn(job, (ctx) => runJournalGeneration(ctx, userId, entityId, fiscalYearId, opts));
   return job;
 }
 

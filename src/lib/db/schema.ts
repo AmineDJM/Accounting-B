@@ -159,7 +159,7 @@ export const invitations = pgTable("invitations", {
 });
 
 /* -------------------------------------------------------- Data sources */
-export type ExchangeKind = "BINANCE" | "GENERIC";
+export type ExchangeKind = "BINANCE" | "KRAKEN" | "COINBASE" | "GENERIC";
 export type AccountStatus = "ACTIVE" | "ERROR" | "DISABLED";
 
 export const exchangeAccounts = pgTable(
@@ -333,7 +333,7 @@ export const journalEntries = pgTable(
 );
 
 /* --------------------------------------------------------------- Jobs */
-export type JobKind = "API_SYNC" | "CSV_IMPORT" | "PRICING" | "JOURNAL";
+export type JobKind = "API_SYNC" | "CSV_IMPORT" | "PRICING" | "JOURNAL" | "REFRESH";
 export type JobStatus = "QUEUED" | "RUNNING" | "DONE" | "FAILED";
 
 export const jobs = pgTable(

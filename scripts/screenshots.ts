@@ -30,6 +30,17 @@ async function main() {
     await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: path === "journal" || path === "dashboard" || path === "dac8" });
     console.log("captured", name);
   }
+  // The connection wizard, on the platform with the most to explain.
+  await page.goto(`${BASE}/app/${entityId}/accounts`); await page.waitForLoadState("networkidle");
+  await page.click('button:has-text("Connecter une plateforme")');
+  await page.waitForTimeout(500);
+  await page.click('button:has-text("Kraken")');
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${OUT}/18-connect.png` });
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  console.log("captured connect wizard");
+
   // A computed result, because an empty tax page shows none of the point of
   // the product: the trace under each figure.
   await page.goto(`${BASE}/app/${entityId}/tax`); await page.waitForLoadState("networkidle");

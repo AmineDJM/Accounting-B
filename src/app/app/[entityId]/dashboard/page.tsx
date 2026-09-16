@@ -9,6 +9,7 @@ import { Alert, EmptyState, Money, PageHeader, Stat, Table, Td, Th } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FlowsChart, PortfolioChart } from "@/components/app/charts";
+import { RefreshAll } from "@/components/app/refresh-all";
 import { fmtDate, fmtEur, fmtNum, fmtPct, TX_TYPE_LABELS } from "@/lib/utils";
 
 export const metadata = { title: "Tableau de bord" };
@@ -25,7 +26,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ enti
     return (
       <>
         <PageHeader title={`Bonjour, ${entity.name}`} description="Commencez par connecter un compte d'échange ou importer un export CSV." />
-        <EmptyState icon={Wallet} title="Aucun compte connecté" description="Ajoutez votre compte Binance (clé API en lecture seule) ou importez l'export « Transaction History ». Tout l'historique est nécessaire pour un coût d'acquisition exact." action={<Link href={`${base}/accounts?welcome=1`}><Button>Connecter un compte <ArrowRight className="h-4 w-4" /></Button></Link>} />
+        <EmptyState icon={Wallet} title="Aucune plateforme connectée" description="Connectez Binance, Kraken ou Coinbase avec une clé en lecture seule, ou déposez un fichier d'export — le format est reconnu tout seul. Tout l'historique est nécessaire pour un coût d'acquisition exact." action={<Link href={`${base}/accounts?welcome=1`}><Button>Connecter une plateforme <ArrowRight className="h-4 w-4" /></Button></Link>} />
       </>
     );
   }
@@ -38,7 +39,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ enti
 
   return (
     <>
-      <PageHeader title="Tableau de bord" description={`${entity.kind === "COMPANY" ? "Société" : "Particulier"} · méthode ${entity.costMethod === "CUMP" ? "coût moyen pondéré" : "PEPS"} · ${accounts.length} compte${accounts.length > 1 ? "s" : ""}`} actions={<Link href={`${base}/accounts`}><Button variant="outline" size="sm"><RefreshCw className="h-4 w-4" /> Synchroniser</Button></Link>} />
+      <PageHeader title="Tableau de bord" description={`${entity.kind === "COMPANY" ? "Société" : "Particulier"} · méthode ${entity.costMethod === "CUMP" ? "coût moyen pondéré" : "PEPS"} · ${accounts.length} compte${accounts.length > 1 ? "s" : ""}`} actions={<div className="flex items-center gap-2"><Link href={`${base}/accounts`}><Button variant="outline" size="sm">Plateformes</Button></Link><RefreshAll entityId={entityId} /></div>} />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Valeur du portefeuille" value={fmtEur(data.totalValueEur)} sub={data.missingPrices.length ? `${data.missingPrices.length} actif(s) sans cours` : `Cours au ${fmtDate(data.pricedAt, true)}`} icon={Coins} />

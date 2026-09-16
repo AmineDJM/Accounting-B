@@ -58,7 +58,7 @@ export interface Counterparty {
 export interface CanonicalTx {
   id: string;
   accountId: string; // exchange account (source of the data)
-  source: "binance_api" | "binance_csv" | "manual" | "generic_csv";
+  source: "binance_api" | "kraken_api" | "coinbase_api" | "binance_csv" | "manual" | "generic_csv";
   externalId: string; // stable id from the source, used for de-duplication
   timestamp: Date; // UTC instant of execution
   type: TxType;
