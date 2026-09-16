@@ -33,7 +33,7 @@ async function settle(entityId: string, jobId: string, label: string) {
 
 async function main() {
   const db = await getDb();
-  const [user] = await db.select().from(users).where(eq(users.email, "demo@chainbook.local"));
+  const [user] = await db.select().from(users).where(eq(users.email, "demo@finly.local"));
   if (!user) throw new Error("Jeu de démonstration absent : lancez d'abord `npm run seed`.");
   const rows = await db.select().from(entities).where(eq(entities.createdBy, user.id));
 

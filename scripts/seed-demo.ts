@@ -58,7 +58,7 @@ async function main() {
   // The demo account is a platform administrator, so the console has an
   // operator to sign in as. A second, ordinary account shows what an account
   // with a restricted set of countries looks like.
-  const email = "demo@chainbook.local";
+  const email = "demo@finly.local";
   let [user] = await db.select().from(users).where(eq(users.email, email));
   if (!user) {
     [user] = await db
@@ -66,7 +66,7 @@ async function main() {
       .values({
         email, name: "Compte démo", emailVerified: new Date(),
         platformRole: "SUPER_ADMIN", status: "ACTIVE", countries: [],
-        company: "Chainbook", activatedAt: new Date(), lastSeenAt: new Date(),
+        company: "Finly", activatedAt: new Date(), lastSeenAt: new Date(),
       })
       .returning();
   }

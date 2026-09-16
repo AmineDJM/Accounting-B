@@ -12,7 +12,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
   const db = await getDb();
-  const [user] = await db.select().from(users).where(eq(users.email, "demo@chainbook.local"));
+  const [user] = await db.select().from(users).where(eq(users.email, "demo@finly.local"));
   const rows = await db.select().from(entities).where(eq(entities.createdBy, user.id));
   for (const e of rows.filter((r) => r.kind === "COMPANY")) {
     const fys = await db.select().from(fiscalYears).where(eq(fiscalYears.entityId, e.id));

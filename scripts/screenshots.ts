@@ -18,7 +18,7 @@ async function main() {
   await page.screenshot({ path: `${OUT}/01-landing.png`, fullPage: false });
   await page.goto(`${BASE}/login`); await page.waitForLoadState("networkidle");
   await page.screenshot({ path: `${OUT}/02-login.png` });
-  await page.fill('input[name="email"]', "demo@chainbook.local");
+  await page.fill('input[name="email"]', "demo@finly.local");
   await page.click('button:has-text("Entrer sans Google")');
   await page.waitForURL(/\/app\//, { timeout: 60000 });
   await page.waitForLoadState("networkidle");

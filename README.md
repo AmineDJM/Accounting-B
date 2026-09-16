@@ -1,4 +1,4 @@
-# Chainbook — comptabilité et fiscalité crypto, douze juridictions
+# Finly — comptabilité et fiscalité crypto, douze juridictions
 
 Application web multi-dossiers, destinée aux cabinets d'expertise comptable et à leurs clients. Elle transforme l'historique de comptes d'échange et de portefeuilles en écritures comptables, en déclarations fiscales et en un rapprochement DAC8, sous les règles du pays qui gouverne le dossier.
 
@@ -35,6 +35,8 @@ Les douze packs portent le statut **DRAFT** : ils sont écrits à partir des tex
 
 ## Aperçu
 
+![Page d'accueil](docs/screenshots/01-landing.png)
+
 | Portefeuille clients | Choix du pays |
 | --- | --- |
 | ![Portefeuille clients](docs/screenshots/11-clients.png) | ![Choix du pays](docs/screenshots/12-country-picker.png) |
@@ -54,6 +56,22 @@ Les douze packs portent le statut **DRAFT** : ils sont écrits à partir des tex
 Les captures se reproduisent avec `npm run seed`, puis `npm run demo` (qui lance les calculs), puis `npx tsx scripts/screenshots.ts`.
 
 Le fichier [`docs/demo-FEC-2025.txt`](docs/demo-FEC-2025.txt) est le FEC produit sur les données de démonstration (exercice 2025 de la société fictive « Nova Digital SAS », SIREN fictif).
+
+## Identité
+
+La marque est un **F construit avec quatre pilules** : une hampe, deux bras de longueur décroissante et un point là où un troisième bras s'arrêterait — le point du « i », emprunté. Les cinq couleurs de la marque n'apparaissent ensemble qu'ici.
+
+| Jeton | Clair | Sombre | Emploi |
+| --- | --- | --- | --- |
+| `--brand-blue` | `#2F6BFF` | `#6D93FF` | Couleur d'action : boutons, liens, sélection |
+| `--brand-violet` | `#7C4DFF` | `#A488FF` | Second accent, dégradé de la hampe, sections cabinet |
+| `--brand-coral` | `#FF5A5F` | `#FF8084` | Accent chaud, bras supérieur, étapes |
+| `--brand-amber` | `#FFB020` | `#FFC45C` | Attention, règles non relues, point de l'icône |
+| `--brand-mint` | `#06BF8B` | `#3AD9A8` | Confirmation, sécurité, éléments rapprochés |
+
+La règle qui tient l'ensemble : **la couleur ne teinte jamais la surface**. L'interface reste blanche ou presque noire, deux gris pour le texte ; les cinq couleurs servent aux marques, aux états et aux données. Un écran plein de chiffres se lit donc en noir sur blanc — c'est ce qu'on demande à un logiciel qu'on regarde une heure d'affilée.
+
+Les jetons vivent dans [`src/app/globals.css`](src/app/globals.css), la marque dans [`src/components/logo.tsx`](src/components/logo.tsx), l'icône d'application dans [`src/app/icon.svg`](src/app/icon.svg).
 
 ## Pile technique
 
@@ -96,14 +114,14 @@ tests/                 moteurs, packs pays, lecteurs CSV, DAC8, fichiers d'audit
 ```bash
 cp .env.example .env.local        # AUTH_SECRET, APP_ENCRYPTION_KEY, AUTH_DEV_LOGIN=true
 npm install
-npm run seed                      # données de démonstration (utilisateur demo@chainbook.local)
+npm run seed                      # données de démonstration (utilisateur demo@finly.local)
 npm run dev                       # http://localhost:3000 → « Entrer sans Google »
 npm test                          # 143 tests
 ```
 
 Sans `DATABASE_URL`, une base PostgreSQL embarquée (PGlite) est créée dans `.data/pglite` et migrée automatiquement.
 
-`npm run seed` crée `demo@chainbook.local` en administrateur de plateforme, plus quatre comptes de cabinet dans les quatre états possibles. Sur une base vierge, le premier administrateur vient de `SUPER_ADMIN_EMAILS` (voir ci-dessous).
+`npm run seed` crée `demo@finly.local` en administrateur de plateforme, plus quatre comptes de cabinet dans les quatre états possibles. Sur une base vierge, le premier administrateur vient de `SUPER_ADMIN_EMAILS` (voir ci-dessous).
 
 ### Connexion Google
 

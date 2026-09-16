@@ -48,7 +48,7 @@ const input: AuditFileInput = {
     { number: "1800", label: "Banque", closingDebit: D("13475.00") },
   ],
   generatedAt: d("2026-09-16T08:00:00Z"),
-  software: { name: "Chainbook", version: "1.0" },
+  software: { name: "Finly", version: "1.0" },
 };
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@", parseTagValue: false });

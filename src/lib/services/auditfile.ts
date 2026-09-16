@@ -65,7 +65,7 @@ export async function buildAuditFile(
     chart: ctx.chart,
     accounts,
     generatedAt: run.createdAt,
-    software: { name: "Chainbook", version: "1.0" },
+    software: { name: "Finly", version: "1.0" },
     timezone: ctx.timezone,
   };
 

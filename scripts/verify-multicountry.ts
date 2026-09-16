@@ -10,7 +10,7 @@ import { cockpit, summarise } from "../src/lib/services/firms";
 
 async function main() {
   const db = await getDb();
-  const [user] = await db.select().from(users).where(eq(users.email, "demo@chainbook.local"));
+  const [user] = await db.select().from(users).where(eq(users.email, "demo@finly.local"));
   const rows = await db.select().from(entities).where(eq(entities.createdBy, user.id));
 
   console.log("=== Cockpit ===");

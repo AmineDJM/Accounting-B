@@ -48,10 +48,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const googleConfigured = Boolean(process.env.AUTH_GOOGLE_ID ?? process.env.GOOGLE_CLIENT_ID);
 
   return (
-    <div className="grid-bg flex min-h-screen items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md">
-        <div className="mb-6 flex justify-center"><Link href="/"><Logo /></Link></div>
-        <div className="rounded-[var(--radius)] border border-border bg-surface p-6 shadow-[var(--shadow-lg)]">
+    <div className="brand-aura relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
+      <div className="rise relative w-full max-w-md">
+        <div className="mb-7 flex justify-center"><Link href="/"><Logo size={32} className="text-[22px]" /></Link></div>
+        <div className="relative overflow-hidden rounded-[calc(var(--radius)+4px)] border border-border bg-surface p-6 shadow-[var(--shadow-lg)]">
+          <div className="absolute inset-x-0 top-0 h-1 brand-rule" aria-hidden />
           <h1 className="text-xl font-semibold tracking-tight">Connexion</h1>
           <p className="mt-1 text-sm text-fg-muted">Un compte Google suffit. Vous créerez ensuite votre premier dossier (société ou particulier).</p>
           {refusal ? (
@@ -86,7 +87,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             >
               <p className="mb-3 text-xs font-medium uppercase tracking-wide text-warning">Mode démonstration (AUTH_DEV_LOGIN)</p>
               <div className="grid gap-3">
-                <Field label="E-mail"><Input name="email" type="email" required placeholder="vous@exemple.fr" defaultValue="demo@chainbook.local" /></Field>
+                <Field label="E-mail"><Input name="email" type="email" required placeholder="vous@exemple.fr" defaultValue="demo@finly.local" /></Field>
                 <Field label="Nom"><Input name="name" placeholder="Prénom Nom" defaultValue="Compte démo" /></Field>
                 <Button type="submit" variant="outline">Entrer sans Google</Button>
               </div>

@@ -2,57 +2,98 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/**
+ * Finly's design tokens.
+ *
+ * Two families, deliberately separated. The neutrals carry the interface:
+ * near-white surfaces, one ink, two greys — the calm an accountant needs to
+ * read a ledger for an hour. The brand colours never tint that surface; they
+ * appear as marks, as state, and as data, so a screen full of figures stays
+ * black on white and the colour means something.
+ */
 :root {
-  --bg: #f6f7f9;
+  /* Surfaces and ink */
+  --bg: #fbfbfd;
   --surface: #ffffff;
-  --surface-2: #f1f3f7;
-  --border: #e4e7ee;
-  --border-strong: #cfd5e1;
-  --fg: #12141a;
-  --fg-muted: #5b6474;
-  --fg-subtle: #8a93a5;
-  --primary: #3b5bfd;
-  --primary-hover: #2f4be0;
+  --surface-2: #f4f4f7;
+  --border: #e7e7ec;
+  --border-strong: #d0d0d8;
+  --fg: #16161a;
+  --fg-muted: #64646e;
+  --fg-subtle: #8c8c96;
+
+  /* The five brand colours. Used together in the mark, one at a time elsewhere. */
+  --brand-blue: #2f6bff;
+  --brand-violet: #7c4dff;
+  --brand-mint: #06bf8b;
+  --brand-amber: #ffb020;
+  --brand-coral: #ff5a5f;
+  --brand-blue-soft: #e8efff;
+  --brand-violet-soft: #f0eaff;
+  --brand-mint-soft: #e0f8f0;
+  --brand-amber-soft: #fff3da;
+  --brand-coral-soft: #ffe9ea;
+
+  /* Actions */
+  --primary: #2f6bff;
+  --primary-hover: #1f56e0;
   --primary-fg: #ffffff;
-  --primary-soft: #e8ecff;
-  --positive: #15803d;
-  --positive-soft: #dcfce7;
-  --negative: #dc2626;
-  --negative-soft: #fee2e2;
-  --warning: #b45309;
-  --warning-soft: #fef3c7;
-  --info: #0369a1;
-  --info-soft: #e0f2fe;
-  --ring: #3b5bfd55;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
-  --shadow-lg: 0 12px 32px -12px rgba(16, 24, 40, 0.25);
-  --radius: 12px;
+  --primary-soft: #e8efff;
+
+  /* Meaning */
+  --positive: #058a5e;
+  --positive-soft: #e0f8f0;
+  --negative: #d92d20;
+  --negative-soft: #ffe9ea;
+  --warning: #a35c00;
+  --warning-soft: #fff3da;
+  --info: #0b6bcb;
+  --info-soft: #e8efff;
+
+  --ring: #2f6bff40;
+  --shadow: 0 1px 2px rgba(16, 18, 27, 0.04), 0 1px 3px rgba(16, 18, 27, 0.05);
+  --shadow-lg: 0 24px 48px -24px rgba(16, 18, 27, 0.22), 0 2px 8px -2px rgba(16, 18, 27, 0.06);
+  --radius: 14px;
 }
 
 .dark {
-  --bg: #0b0d12;
-  --surface: #12151c;
-  --surface-2: #181c25;
-  --border: #232838;
-  --border-strong: #303748;
-  --fg: #eef0f5;
-  --fg-muted: #a3abbd;
-  --fg-subtle: #6f788c;
-  --primary: #6d86ff;
-  --primary-hover: #8399ff;
-  --primary-fg: #0b0d12;
-  --primary-soft: #1c2447;
-  --positive: #4ade80;
-  --positive-soft: #0f2a1b;
-  --negative: #f87171;
-  --negative-soft: #3a1414;
-  --warning: #fbbf24;
-  --warning-soft: #3a2a08;
-  --info: #38bdf8;
-  --info-soft: #0c2a3a;
-  --ring: #6d86ff66;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 16px 40px -16px rgba(0, 0, 0, 0.7);
+  --bg: #0a0a0c;
+  --surface: #141418;
+  --surface-2: #1c1c21;
+  --border: #26262c;
+  --border-strong: #35353d;
+  --fg: #f5f5f7;
+  --fg-muted: #a0a0aa;
+  --fg-subtle: #7a7a84;
+
+  --brand-blue: #6d93ff;
+  --brand-violet: #a488ff;
+  --brand-mint: #3ad9a8;
+  --brand-amber: #ffc45c;
+  --brand-coral: #ff8084;
+  --brand-blue-soft: #16213f;
+  --brand-violet-soft: #221c3d;
+  --brand-mint-soft: #0d2b23;
+  --brand-amber-soft: #2e2211;
+  --brand-coral-soft: #331718;
+
+  --primary: #6d93ff;
+  --primary-hover: #89a8ff;
+  --primary-fg: #0a0a0c;
+  --primary-soft: #16213f;
+
+  --positive: #3ad9a8;
+  --positive-soft: #0d2b23;
+  --negative: #ff7a70;
+  --negative-soft: #331718;
+  --warning: #ffc45c;
+  --warning-soft: #2e2211;
+  --info: #6db4ff;
+  --info-soft: #102538;
+
+  --ring: #6d93ff55;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 28px 56px -28px rgba(0, 0, 0, 0.8), 0 2px 8px -2px rgba(0, 0, 0, 0.4);
 }
 
 @theme inline {
@@ -76,6 +117,16 @@
   --color-warning-soft: var(--warning-soft);
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-violet: var(--brand-violet);
+  --color-brand-mint: var(--brand-mint);
+  --color-brand-amber: var(--brand-amber);
+  --color-brand-coral: var(--brand-coral);
+  --color-brand-blue-soft: var(--brand-blue-soft);
+  --color-brand-violet-soft: var(--brand-violet-soft);
+  --color-brand-mint-soft: var(--brand-mint-soft);
+  --color-brand-amber-soft: var(--brand-amber-soft);
+  --color-brand-coral-soft: var(--brand-coral-soft);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
   --radius-card: var(--radius);
@@ -87,11 +138,54 @@
 html { color-scheme: light; }
 html.dark { color-scheme: dark; }
 body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+
+/* Display type is set tight: the wider the line, the tighter it reads well. */
+h1, h2, h3 { letter-spacing: -0.021em; }
+.display { letter-spacing: -0.035em; line-height: 1.04; }
+
 .tabular { font-variant-numeric: tabular-nums; }
 .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 ::selection { background: var(--primary-soft); }
 .scrollbar-thin::-webkit-scrollbar { height: 8px; width: 8px; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 8px; }
+
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 .skeleton { background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%); background-size: 200% 100%; animation: shimmer 1.6s infinite; }
 .grid-bg { background-image: radial-gradient(var(--border-strong) 1px, transparent 1px); background-size: 22px 22px; }
+
+/* The five colours in one sweep: headline words, rules, the top of the page. */
+.brand-text {
+  background: linear-gradient(100deg, var(--brand-blue), var(--brand-violet) 34%, var(--brand-coral) 62%, var(--brand-amber) 82%, var(--brand-mint));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.brand-rule { background: linear-gradient(90deg, var(--brand-blue), var(--brand-violet), var(--brand-coral), var(--brand-amber), var(--brand-mint)); }
+
+/* A wash of the palette behind the hero, wide and faint enough to stay calm. */
+.brand-aura::before {
+  content: "";
+  position: absolute;
+  inset: -30% -10% auto -10%;
+  height: 560px;
+  background:
+    radial-gradient(38% 52% at 18% 30%, color-mix(in oklab, var(--brand-blue) 22%, transparent), transparent 70%),
+    radial-gradient(34% 46% at 50% 8%, color-mix(in oklab, var(--brand-violet) 18%, transparent), transparent 70%),
+    radial-gradient(30% 44% at 82% 26%, color-mix(in oklab, var(--brand-mint) 16%, transparent), transparent 70%),
+    radial-gradient(26% 36% at 66% 52%, color-mix(in oklab, var(--brand-amber) 14%, transparent), transparent 70%);
+  filter: blur(18px);
+  pointer-events: none;
+}
+
+/* Cards that lift a little on approach. Kept to marketing surfaces. */
+.lift { transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1); }
+.lift:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise 640ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rise { animation: none; }
+  .lift { transition: none; }
+  .lift:hover { transform: none; }
+}

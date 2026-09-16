@@ -17,7 +17,7 @@ async function main() {
   const page = await ctx.newPage();
   page.on("pageerror", (e) => console.error("pageerror", e.message));
   await page.goto(`${BASE}/login`);
-  await page.fill('input[name="email"]', "demo@chainbook.local");
+  await page.fill('input[name="email"]', "demo@finly.local");
   await page.click('button:has-text("Entrer sans Google")');
   await page.waitForURL(/\/app\//, { timeout: 60000 });
   await page.waitForLoadState("networkidle");

@@ -13,7 +13,7 @@ export type Impersonation = typeof impersonations.$inferSelect;
 
 /** How long a view-as session lasts before it closes itself. */
 export const IMPERSONATION_TTL_MS = 60 * 60 * 1000;
-export const IMPERSONATION_COOKIE = "chainbook_view_as";
+export const IMPERSONATION_COOKIE = "finly_view_as";
 
 /**
  * Decides whether an address may open a session at all.
