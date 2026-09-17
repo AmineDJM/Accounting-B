@@ -26,6 +26,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=2048"   # a ceiling per process, so the build collects garbage rather than growing into the runner
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL

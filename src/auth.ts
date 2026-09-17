@@ -25,8 +25,6 @@ import { googleCredentials } from "@/lib/dal/settings";
  * SUPER_ADMIN_EMAILS and the holder of the start-up code, because the first
  * administrator cannot be created by an administrator.
  */
-const db = await getDb();
-
 /** Providers that carry their own admission check, so `signIn` lets them past. */
 const SELF_ADMITTED = new Set(["dev-login", "bootstrap"]);
 
@@ -64,6 +62,11 @@ const bootstrapLogin = Credentials({
 });
 
 export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
+  // Opened here rather than at import time: a build worker that loads this
+  // module must not spin up a database (an embedded PGlite instance, during a
+  // build) just to collect route metadata. `getDb` memoises, so a request pays
+  // for it once.
+  const db = await getDb();
   const providers: NextAuthConfig["providers"] = [];
   const google = await googleCredentials();
   if (google.clientId && google.clientSecret) {
