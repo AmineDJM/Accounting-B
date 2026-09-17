@@ -16,7 +16,10 @@ services:
     runtime: node
     region: frankfurt            # EU region: Binance/Coinbase APIs refuse some US IPs (HTTP 451)
     plan: starter                # free instances sleep; syncs need a persistent process
-    buildCommand: npm ci && npm run build
+    # --include=dev is not optional: NODE_ENV=production below makes npm omit
+    # devDependencies, and the build needs Tailwind, PostCSS and TypeScript,
+    # which live there. Without it the build dies on globals.css.
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm run start
     healthCheckPath: /api/health
     autoDeploy: true
